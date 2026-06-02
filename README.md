@@ -1,6 +1,6 @@
 # com5fy
 
-This is a library of custom ComfyUI nodes that use the m5 (mmmmm) Python library, bringing support for musical representations, transformations, and editing to ComfUI.
+This is a library of custom ComfyUI nodes that use the m5 (mmmmm) Python library, bringing support for musical representations, transformations, and editing to ComfyUI.
 
 ## Installation
 
@@ -21,11 +21,11 @@ git clone https://github.com/dzluke/mmmmm.git
 
 ### 3. Add custom nodes
 
-Clone the [com5fy](https://github.com/dzluke/com5fy) repository and place the `m5_nodes` folder into the `ComfyUI/custom_nodes/` folder.
+From incide the `ComfyUI/custom_nodes/` folder, clone the [com5fy](https://github.com/dzluke/com5fy) repository.
 
 ```bash
+cd custom_nodes
 git clone https://github.com/dzluke/com5fy.git
-mv m5_nodes ComfyUI/custom_nodes/
 ```
 
 ### 4. Set up the Python environment
