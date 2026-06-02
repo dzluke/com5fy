@@ -1,0 +1,62 @@
+# com5fy
+
+This is a library of custom ComfyUI nodes that use the m5 (mmmmm) Python library, bringing support for musical representations, transformations, and editing to ComfUI.
+
+## Installation
+
+### 1. Clone ComfyUI
+
+```bash
+git clone https://github.com/Comfy-Org/ComfyUI.git
+cd ComfyUI
+```
+
+### 2. Clone the mmmmm repo into ComfyUI
+
+From inside the `ComfyUI` directory:
+
+```bash
+git clone https://github.com/dzluke/mmmmm.git
+```
+
+### 3. Add custom nodes
+
+Clone the [com5fy](https://github.com/dzluke/com5fy) repository and place the `m5_nodes` folder into the `ComfyUI/custom_nodes/` folder.
+
+```bash
+git clone https://github.com/dzluke/com5fy.git
+mv m5_nodes ComfyUI/custom_nodes/
+```
+
+### 4. Set up the Python environment
+
+This project uses [uv](https://docs.astral.sh/uv/) for environment management. If you don't have it installed:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+From the `ComfyUI` directory, create a virtual environment and install dependencies:
+
+```bash
+uv venv
+uv pip install -r requirements.txt
+```
+
+Then install the `mmmmm` package as a local editable install, which will add it as a [workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/):
+
+```bash
+uv pip install -e mmmmm/
+```
+
+### 5. Run ComfyUI
+
+```bash
+uv run python main.py
+```
+
+You will now be able to create custom nodes in ComfyUI that come from the com5fy package and use the m5 (mmmmm) library.
+
+## Orchidea setup
+
+To run audio to score with Orchidea, you will need to download a dataset from https://www.orch-idea.org/datasets/. It is recommended to start with the TinySOL database. The Orchidea orchestrate executable is bundled in the m5 package.
