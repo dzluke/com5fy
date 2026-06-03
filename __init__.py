@@ -7,7 +7,7 @@ the implementations live in ``nodes.py``.
 
 from .nodes import (
     WEB_DIRECTORY,
-    M5Score,
+    m5Score,
     OrchideaNode,
     ScoreViewer,
     LoadScore,
@@ -17,7 +17,7 @@ from .nodes import (
 
 __all__ = [
     "WEB_DIRECTORY",
-    "M5Score",
+    "m5Score",
     "OrchideaNode",
     "ScoreViewer",
     "LoadScore",

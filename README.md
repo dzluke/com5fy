@@ -21,7 +21,7 @@ git clone https://github.com/dzluke/mmmmm.git
 
 ### 3. Add custom nodes
 
-From incide the `ComfyUI/custom_nodes/` folder, clone the [com5fy](https://github.com/dzluke/com5fy) repository.
+From inside the `ComfyUI/custom_nodes/` folder, clone the [com5fy](https://github.com/dzluke/com5fy) repository.
 
 ```bash
 cd custom_nodes

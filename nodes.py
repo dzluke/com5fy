@@ -13,20 +13,35 @@ from comfy_api.latest import ComfyExtension, io
 import m5
 import music21
 
-# Any .js file in this directory is loaded by the ComfyUI frontend as an
-# extension. Resolved relative to the package directory (custom_nodes/m5_nodes),
-# so it points at custom_nodes/m5_nodes/js — where the Score Viewer's OSMD widget
-# lives. A folder package (not a single .py file) is required here: ComfyUI
-# registers a single-file module's web dir under its absolute path, which the
-# /extensions route then fails to serve.
+# Any .js file in this directory is loaded by the ComfyUI frontend as an extension.
 WEB_DIRECTORY = "./js"
 
 
 @io.comfytype(io_type="M5_SCORE")
-class M5Score(io.ComfyTypeIO):
+class m5Score(io.ComfyTypeIO):
     """An m5.Score (a music21-backed Score) passed between m5 nodes. Produced by
     Orchidea and LoadScore; consumed by ScoreViewer."""
     Type = Any
+
+
+def _to_m5_audio(audio: io.Audio.Type) -> m5.Audio:
+    """Convert a ComfyUI AUDIO dict to an m5.Audio, coercing the waveform to a
+    numpy array and transposing from Comfy's (batch, channels, frames) layout to
+    m5's (channels, frames) layout."""
+    waveform = audio["waveform"]  # type: torch.Tensor
+    sample_rate = audio["sample_rate"]  # type: ignore[typeddict-item]
+    if waveform.ndim != 3:
+        raise ValueError(
+            f"Expected ComfyUI AUDIO waveform to have 3 dimensions "
+            f"(batch, channels, frames), but got shape {waveform.shape}"
+        )
+    if waveform.shape[0] != 1:
+        raise ValueError(
+            f"Expected ComfyUI AUDIO batch size of 1, but got {waveform.shape[0]}"
+        )
+    # Remove batch axis and transpose to (frames, channels).
+    waveform_np = waveform[0].numpy(force=True) # type: np.ndarray
+    return m5.Audio(waveform=waveform_np, sample_rate=sample_rate)
 
 
 def _render_score_to_image(m21_score: music21.stream.Score) -> torch.Tensor:
@@ -91,7 +106,7 @@ class OrchideaNode(io.ComfyNode):
             display_name="Orchidea",
             category="audio",
             inputs=[
-                io.Audio.Input("audio"),
+                io.MultiType.Input("audio", types=[io.Audio, m5Score]),
                 io.String.Input(
                     "db_files",
                     default="",
@@ -177,7 +192,7 @@ class OrchideaNode(io.ComfyNode):
                 ),
             ],
             outputs=[
-                M5Score.Output("score"),
+                m5Score.Output("score"),
                 io.Image.Output("score_image"),
                 io.Audio.Output(
                     "audio",
@@ -204,13 +219,7 @@ class OrchideaNode(io.ComfyNode):
         partials_filtering_threshold_db: float,
         onsets_threshold: float,
     ) -> io.NodeOutput:
-        # ComfyUI's AUDIO is a dict: waveform is a [batch, channels, samples]
-        # torch tensor and sample_rate is an int. Audio.from_comfy converts
-        # that to m5's canonical (frames, channels) numpy layout and, for now,
-        # requires a single-item batch (raising on batch > 1).
-        waveform = audio["waveform"]
-        sample_rate = audio["sample_rate"]  # type: ignore[typeddict-item]
-        m5_audio = m5.Audio.from_comfy(waveform, sample_rate)
+        m5_audio = _to_m5_audio(audio)
 
         # These override the matching keys in the Orchidea config file.
         parameters = {
@@ -233,29 +242,24 @@ class OrchideaNode(io.ComfyNode):
         if sound_paths.strip():
             parameters["sound_paths"] = sound_paths.strip()
 
-        result = m5.orchestrate(m5_audio, parameters=parameters)
-        score = result.score
+        orchestration = m5.orchestrate(m5_audio, parameters=parameters)
+        score = orchestration.score
         score_image = _render_score_to_image(score.score)
 
-        # result.audio is m5's connection.wav realization: a (frames,) or
-        # (frames, channels) numpy array. ComfyUI's AUDIO is the mirror image of
-        # Audio.from_comfy — a (batch, channels, frames) torch tensor with a
-        # single batch item — so transpose to channels-first and add the batch
-        # axis. (Kept here rather than in m5, which stays torch-free by design.)
-        if result.audio is None:
+        if orchestration.audio is None:
             raise RuntimeError(
                 "Orchidea produced no audio realization (connection.wav). This "
                 "can happen if the constraints were too strict. Try reducing the "
                 "partials filtering or including more dynamics and playing styles."
             )
-        waveform_out = result.audio.waveform
+        waveform_out = orchestration.audio.waveform
         if waveform_out.ndim == 1:
-            waveform_out = waveform_out[:, None]  # (frames,) -> (frames, 1)
+            waveform_out = waveform_out[None,: ]  # (frames,) -> (frames, 1)
         audio_out = {
             "waveform": torch.from_numpy(
                 np.ascontiguousarray(waveform_out.T)
             ).unsqueeze(0),
-            "sample_rate": result.audio.sample_rate,
+            "sample_rate": orchestration.audio.sample_rate,
         }
         return io.NodeOutput(score, score_image, audio_out)
 
@@ -275,7 +279,7 @@ class ScoreViewer(io.ComfyNode):
             node_id="m5_ScoreViewer",
             display_name="Score Viewer",
             category="music",
-            inputs=[M5Score.Input("score")],
+            inputs=[m5Score.Input("score")],
             outputs=[],
             # No graph outputs, so mark it an output node: that makes ComfyUI
             # always execute it and deliver the returned `ui` to the frontend.
@@ -310,7 +314,7 @@ class LoadScore(io.ComfyNode):
                     ),
                 ),
             ],
-            outputs=[M5Score.Output("score")],
+            outputs=[m5Score.Output("score")],
         )
 
     @classmethod
