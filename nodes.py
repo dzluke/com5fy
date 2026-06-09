@@ -49,6 +49,14 @@ class m5Score(io.ComfyTypeIO):
     Type = Any
 
 
+@io.comfytype(io_type="M5_SEQUENCE")
+class m5Sequence(io.ComfyTypeIO):
+    """A raw, unquantized m5.Sequence passed between m5 nodes. Produced by
+    Orchidea (the orchestration before it is quantized into a Score); consumed by
+    SequenceViewer, which renders it as proportional, time-based notation."""
+    Type = Any
+
+
 def _to_m5_audio(audio: io.Audio.Type) -> m5.Audio:
     """Convert a ComfyUI AUDIO dict to an m5.Audio, coercing the waveform to a
     numpy array and transposing from Comfy's (batch, channels, frames) layout to
@@ -120,6 +128,119 @@ def _render_score_to_image(m21_score: music21.stream.Score) -> torch.Tensor:
             batch[i, : im.shape[0], : im.shape[1], :] = im
 
         return torch.from_numpy(batch)
+
+
+def _first(values):
+    """First value of an Event field list (or None). Event fields hold a list of
+    values (one per chord member / voice)."""
+    return values[0] if values else None
+
+
+# Sharp spellings only, so a MIDI-derived pitch name is always unambiguous for the
+# frontend. (music21's nameWithOctave spells flats with "-", e.g. "B-4", which
+# collides with a negative octave when parsed in JS; the symbolic pitches Orchidea
+# emits already use "#".)
+_MIDI_SHARP_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+
+
+def _midi_to_name(midi: int) -> str:
+    """Convert a MIDI note number to a sharp-spelled pitch name like "C#4"
+    (MIDI 60 ⇒ "C4", following the convention that MIDI 60 is middle C / C4)."""
+    return f"{_MIDI_SHARP_NAMES[midi % 12]}{midi // 12 - 1}"
+
+
+def _flatten_sequence(sequence, base_ms: float = 0.0) -> list[tuple[float, Any]]:
+    """Flatten a (possibly nested) m5.Sequence into ``(absolute_start_ms, Event)``
+    pairs, accumulating the onset of each enclosing Sequence.
+
+    Mirrors ``m5.score._flatten`` so the Sequence Viewer reads a Sequence's
+    hierarchy exactly as ``Score.from_sequence`` does, kept local so this node
+    doesn't depend on a private name in m5.
+    """
+    out: list[tuple[float, Any]] = []
+    for start, item in sequence.events:
+        if isinstance(item, m5.Sequence):
+            out.extend(_flatten_sequence(item, base_ms + start))
+        else:
+            out.append((base_ms + start, item))
+    out.sort(key=lambda pair: pair[0])
+    return out
+
+
+def _note_payload(start_ms: float, event) -> dict:
+    """Serialize one m5.Event into a plain dict for the Sequence Viewer frontend.
+
+    ``pitches`` is always a list of symbolic pitch-name strings: the Event's own
+    ``pitch`` values when present, otherwise derived from its ``midi_note`` values
+    (so the frontend always gets names and never has to know MIDI). An empty list
+    means an unpitched event. Onset and duration stay in milliseconds.
+    """
+    if event.pitch:
+        pitches = list(event.pitch)
+    elif event.midi_note:
+        pitches = [_midi_to_name(m) for m in event.midi_note]
+    else:
+        pitches = []
+
+    note = {
+        "start_ms": start_ms,
+        "duration_ms": event.duration,
+        "pitches": pitches,
+    }
+    # Optional per-note annotations, included only when present so the payload
+    # stays small and the frontend can treat them as truly optional.
+    dynamic = _first(event.dynamic)
+    if dynamic is not None:
+        note["dynamic"] = dynamic
+    style = _first(event.playing_style)
+    if style is not None:
+        note["playing_style"] = style
+    detuning = _first(event.custom_fields.get("detuning_cents"))
+    if detuning:
+        note["detuning_cents"] = detuning
+    return note
+
+
+def _sequence_to_payload(sequence) -> dict:
+    """Serialize an m5.Sequence into the JSON payload the Sequence Viewer renders.
+
+    The Sequence is interpreted hierarchically the same way ``Score.from_sequence``
+    does: each top-level item that is itself a Sequence becomes one staff, and any
+    bare top-level Events are collected into a single default staff. Each staff is
+    flattened to absolute-millisecond onsets and named from its events'
+    ``instrument`` custom field. The result is::
+
+        {"staves": [{"instrument": str|None, "notes": [note, ...]}, ...],
+         "duration_ms": float}
+    """
+    staff_seqs: list = []
+    loose: list[tuple[float, Any]] = []
+    for start, item in sequence.events:
+        if isinstance(item, m5.Sequence):
+            staff_seqs.append((start, item))
+        else:
+            loose.append((start, item))
+    if loose:
+        staff_seqs.append((0.0, m5.Sequence(events=loose)))
+
+    staves: list[dict] = []
+    duration_ms = 0.0
+    for base_ms, staff_seq in staff_seqs:
+        events = _flatten_sequence(staff_seq, base_ms)
+        instrument = next(
+            (
+                _first(event.custom_fields.get("instrument"))
+                for _, event in events
+                if _first(event.custom_fields.get("instrument"))
+            ),
+            None,
+        )
+        notes = [_note_payload(start_ms, event) for start_ms, event in events]
+        for note in notes:
+            duration_ms = max(duration_ms, note["start_ms"] + note["duration_ms"])
+        staves.append({"instrument": instrument, "notes": notes})
+
+    return {"staves": staves, "duration_ms": duration_ms}
 
 
 class OrchideaNode(io.ComfyNode):
@@ -232,6 +353,15 @@ class OrchideaNode(io.ComfyNode):
                         "realization."
                     ),
                 ),
+                m5Sequence.Output(
+                    "sequence",
+                    tooltip=(
+                        "The raw, unquantized orchestration as an m5.Sequence "
+                        "(before it is quantized into the Score). Feed it to a "
+                        "Sequence Viewer to see the exact onset times as "
+                        "proportional, time-based notation."
+                    ),
+                ),
             ],
         )
 
@@ -273,6 +403,8 @@ class OrchideaNode(io.ComfyNode):
         orchestration = m5.orchestrate(m5_audio, parameters=parameters)
         # orchestrate() returns the orchestration as an m5.Sequence;
         # build the music21-backed Score the viewer/image rendering needs.
+        # The raw orchestration.sequence is also exposed as an output so it can
+        # be shown unquantized (proportional notation) by the Sequence Viewer.
         score = m5.Score.from_sequence(orchestration.sequence)
         score_image = _render_score_to_image(score.score)
 
@@ -291,7 +423,7 @@ class OrchideaNode(io.ComfyNode):
             ).unsqueeze(0),
             "sample_rate": orchestration.audio.sample_rate,
         }
-        return io.NodeOutput(score, score_image, audio_out)
+        return io.NodeOutput(score, score_image, audio_out, orchestration.sequence)
 
 
 class ScoreViewer(io.ComfyNode):
@@ -326,6 +458,58 @@ class ScoreViewer(io.ComfyNode):
         with _no_placeholder_metadata():
             musicxml = score.to_musicxml()
         return io.NodeOutput(ui={"musicxml": [musicxml]})
+
+
+class SequenceViewer(io.ComfyNode):
+    """Display a raw, unquantized m5.Sequence as proportional, time-based notation.
+
+    Unlike the Score Viewer (which engraves a quantized Score in conventional
+    metered notation), this viewer has no bar lines, meters or beats: every event
+    is an identical notehead placed horizontally at its absolute onset *time*, one
+    stacked staff per instrument over a shared time axis, with overlapping voices
+    allowed within a staff. It serializes the Sequence to a plain JSON payload and
+    hands it to the frontend widget, which renders it with VexFlow.
+    """
+
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="m5_SequenceViewer",
+            display_name="Sequence Viewer",
+            category="music",
+            inputs=[
+                m5Sequence.Input("sequence"),
+                io.Float.Input(
+                    "pixels_per_second",
+                    default=120.0,
+                    min=4.0,
+                    max=2000.0,
+                    step=4.0,
+                    tooltip=(
+                        "Horizontal time scale: how many pixels one second of the "
+                        "timeline occupies. Larger values spread events out; scroll "
+                        "the viewer horizontally to travel through time."
+                    ),
+                ),
+            ],
+            outputs=[],
+            # No graph outputs, so mark it an output node: that makes ComfyUI
+            # always execute it and deliver the returned `ui` to the frontend.
+            is_output_node=True,
+        )
+
+    @classmethod
+    def execute(cls, sequence, pixels_per_second: float) -> io.NodeOutput:
+        # `sequence` is the m5.Sequence carried by M5_SEQUENCE. Serialize it to the
+        # plain JSON payload the frontend renders; the frontend reads
+        # message.sequence_data[0] and message.pixels_per_second[0].
+        payload = _sequence_to_payload(sequence)
+        return io.NodeOutput(
+            ui={
+                "sequence_data": [payload],
+                "pixels_per_second": [pixels_per_second],
+            }
+        )
 
 
 class LoadScore(io.ComfyNode):
@@ -363,6 +547,7 @@ class m5Extension(ComfyExtension):
         return [
             OrchideaNode,
             ScoreViewer,
+            SequenceViewer,
             LoadScore,
         ]
 

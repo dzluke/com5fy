@@ -8,8 +8,10 @@ the implementations live in ``nodes.py``.
 from .nodes import (
     WEB_DIRECTORY,
     m5Score,
+    m5Sequence,
     OrchideaNode,
     ScoreViewer,
+    SequenceViewer,
     LoadScore,
     m5Extension,
     comfy_entrypoint,
@@ -18,8 +20,10 @@ from .nodes import (
 __all__ = [
     "WEB_DIRECTORY",
     "m5Score",
+    "m5Sequence",
     "OrchideaNode",
     "ScoreViewer",
+    "SequenceViewer",
     "LoadScore",
     "m5Extension",
     "comfy_entrypoint",
