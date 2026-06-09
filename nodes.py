@@ -1,3 +1,4 @@
+import contextlib
 import os
 import tempfile
 from pathlib import Path
@@ -15,6 +16,30 @@ import music21
 
 # Any .js file in this directory is loaded by the ComfyUI frontend as an extension.
 WEB_DIRECTORY = "./js"
+
+
+@contextlib.contextmanager
+def _no_placeholder_metadata():
+    """Suppress music21's placeholder title/composer while exporting a score.
+
+    music21's MusicXML exporter falls back to global defaults
+    (``defaults.title`` = "Music21 Fragment", ``defaults.author`` = "Music21")
+    whenever a score carries no real title/composer, so a score that simply
+    lacks metadata comes out stamped with those placeholders. Blanking the two
+    defaults for the duration of an export makes the exporter emit no
+    movement-title/creator at all in that case, while any *real* metadata the
+    score does hold is still written through untouched (the exporter only
+    reaches for the defaults when nothing real is found). Restored afterwards so
+    we don't mutate music21's global state for anything else."""
+    saved_title = music21.defaults.title
+    saved_author = music21.defaults.author
+    music21.defaults.title = ""
+    music21.defaults.author = ""
+    try:
+        yield
+    finally:
+        music21.defaults.title = saved_title
+        music21.defaults.author = saved_author
 
 
 @io.comfytype(io_type="M5_SCORE")
@@ -58,8 +83,11 @@ def _render_score_to_image(m21_score: music21.stream.Score) -> torch.Tensor:
     with tempfile.TemporaryDirectory() as tmp:
         fp = os.path.join(tmp, "score.png")
         # write() returns the path MuseScore actually produced (page 1); we glob
-        # the directory instead so every page is picked up.
-        m21_score.write("musicxml.png", fp=fp)
+        # the directory instead so every page is picked up. Suppress music21's
+        # placeholder title/composer so an untitled score isn't engraved with
+        # "Music21 Fragment" / "Music21".
+        with _no_placeholder_metadata():
+            m21_score.write("musicxml.png", fp=fp)
 
         stem = Path(fp).stem
         pages = sorted(
@@ -243,7 +271,9 @@ class OrchideaNode(io.ComfyNode):
             parameters["sound_paths"] = sound_paths.strip()
 
         orchestration = m5.orchestrate(m5_audio, parameters=parameters)
-        score = orchestration.score
+        # orchestrate() returns the orchestration as an m5.Sequence;
+        # build the music21-backed Score the viewer/image rendering needs.
+        score = m5.Score.from_sequence(orchestration.sequence)
         score_image = _render_score_to_image(score.score)
 
         if orchestration.audio is None:
@@ -290,7 +320,12 @@ class ScoreViewer(io.ComfyNode):
     def execute(cls, score) -> io.NodeOutput:
         # score is the m5.Score object carried by M5_SCORE. to_musicxml() exports
         # it headlessly (no MuseScore). The frontend reads message.musicxml[0].
-        return io.NodeOutput(ui={"musicxml": [score.to_musicxml()]})
+        # Suppress music21's placeholder title/composer so a score without
+        # metadata isn't shown titled "Music21 Fragment" / "Music21"; real
+        # title/composer/subtitle in the score are preserved.
+        with _no_placeholder_metadata():
+            musicxml = score.to_musicxml()
+        return io.NodeOutput(ui={"musicxml": [musicxml]})
 
 
 class LoadScore(io.ComfyNode):
