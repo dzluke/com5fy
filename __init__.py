@@ -12,7 +12,9 @@ from .nodes import (
     OrchideaNode,
     ScoreViewer,
     SequenceViewer,
+    SequenceToAudio,
     LoadScore,
+    AudioPlayback,
     m5Extension,
     comfy_entrypoint,
 )
@@ -24,7 +26,9 @@ __all__ = [
     "OrchideaNode",
     "ScoreViewer",
     "SequenceViewer",
+    "SequenceToAudio",
     "LoadScore",
+    "AudioPlayback",
     "m5Extension",
     "comfy_entrypoint",
 ]

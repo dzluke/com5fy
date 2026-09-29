@@ -1,15 +1,16 @@
 import contextlib
 import os
 import tempfile
+import uuid
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import torch
-from PIL import Image
 from typing_extensions import override
 
 from comfy_api.latest import ComfyExtension, io
+import folder_paths
 
 import m5
 import music21
@@ -57,10 +58,16 @@ class m5Sequence(io.ComfyTypeIO):
     Type = Any
 
 
+# Nodes pass audio between each other as ComfyUI's builtin AUDIO, so they connect
+# to Load Audio, Save Audio and every other audio node. m5 works on m5.Audio, so
+# each node converts at its boundary with these two functions: the only places
+# that deal with Comfy's tensor layout.
+
+
 def _to_m5_audio(audio: io.Audio.Type) -> m5.Audio:
     """Convert a ComfyUI AUDIO dict to an m5.Audio, coercing the waveform to a
-    numpy array and transposing from Comfy's (batch, channels, frames) layout to
-    m5's (channels, frames) layout."""
+    numpy array and dropping the batch axis to go from Comfy's (batch, channels,
+    frames) layout to m5's (channels, frames) layout."""
     waveform = audio["waveform"]  # type: torch.Tensor
     sample_rate = audio["sample_rate"]  # type: ignore[typeddict-item]
     if waveform.ndim != 3:
@@ -72,62 +79,18 @@ def _to_m5_audio(audio: io.Audio.Type) -> m5.Audio:
         raise ValueError(
             f"Expected ComfyUI AUDIO batch size of 1, but got {waveform.shape[0]}"
         )
-    # Remove batch axis and transpose to (frames, channels).
-    waveform_np = waveform[0].numpy(force=True) # type: np.ndarray
-    return m5.Audio(waveform=waveform_np, sample_rate=sample_rate)
+    # Remove the batch axis; m5.Audio casts to float32.
+    return m5.Audio(waveform=waveform[0].float().numpy(force=True), sample_rate=sample_rate)
 
 
-def _render_score_to_image(m21_score: music21.stream.Score) -> torch.Tensor:
-    """Render a music21 Score to a ComfyUI IMAGE tensor.
-
-    music21 hands the score to its configured backend (MuseScore), which writes one
-    PNG per page (``score-1.png``, ``score-2.png``, ...). Those PNGs are RGBA with
-    the notation carried in the alpha channel over a transparent, black-RGB
-    background, so each page is composited onto white before being turned into the
-    ``[batch, height, width, channel]`` float tensor (RGB, 0-1) that ComfyUI uses
-    for IMAGE. Multi-page scores are padded to a common size (with white) and
-    returned as a single image batch, which a Preview Image node shows page by page.
-    """
-    with tempfile.TemporaryDirectory() as tmp:
-        fp = os.path.join(tmp, "score.png")
-        # write() returns the path MuseScore actually produced (page 1); we glob
-        # the directory instead so every page is picked up. Suppress music21's
-        # placeholder title/composer so an untitled score isn't engraved with
-        # "Music21 Fragment" / "Music21".
-        with _no_placeholder_metadata():
-            m21_score.write("musicxml.png", fp=fp)
-
-        stem = Path(fp).stem
-        pages = sorted(
-            Path(tmp).glob(f"{stem}-*.png"),
-            key=lambda p: int(p.stem.rsplit("-", 1)[-1]),
-        )
-        if not pages:
-            raise RuntimeError(
-                f"music21/MuseScore produced no PNG for the score in {tmp!r}. "
-                "Check that a MuseScore backend is installed and configured "
-                "(music21.environment musicxmlPath / musescoreDirectPNGPath)."
-            )
-
-        images: list[np.ndarray] = []
-        for page in pages:
-            img = Image.open(page)
-            if "A" in img.getbands():
-                background = Image.new("RGB", img.size, (255, 255, 255))
-                background.paste(img, mask=img.getchannel("A"))
-                img = background
-            else:
-                img = img.convert("RGB")
-            images.append(np.asarray(img, dtype=np.float32) / 255.0)
-
-        height = max(im.shape[0] for im in images)
-        width = max(im.shape[1] for im in images)
-        # White canvas so shorter pages are padded with blank paper, not black.
-        batch = np.ones((len(images), height, width, 3), dtype=np.float32)
-        for i, im in enumerate(images):
-            batch[i, : im.shape[0], : im.shape[1], :] = im
-
-        return torch.from_numpy(batch)
+def _to_comfy_audio(audio: m5.Audio) -> dict:
+    """Convert an m5.Audio to a ComfyUI AUDIO dict, adding the batch axis to go
+    from m5's (channels, frames) layout to Comfy's (batch, channels, frames).
+    m5.Audio is already float32, which is what Comfy's audio nodes expect."""
+    return {
+        "waveform": torch.from_numpy(np.ascontiguousarray(audio.waveform)).unsqueeze(0),
+        "sample_rate": audio.sample_rate,
+    }
 
 
 def _first(values):
@@ -255,7 +218,7 @@ class OrchideaNode(io.ComfyNode):
             display_name="Orchidea",
             category="audio",
             inputs=[
-                io.MultiType.Input("audio", types=[io.Audio, m5Score]),
+                io.Audio.Input("audio"),
                 io.String.Input(
                     "db_files",
                     default="",
@@ -342,7 +305,6 @@ class OrchideaNode(io.ComfyNode):
             ],
             outputs=[
                 m5Score.Output("score"),
-                io.Image.Output("score_image"),
                 io.Audio.Output(
                     "audio",
                     display_name="audio",
@@ -406,7 +368,6 @@ class OrchideaNode(io.ComfyNode):
         # The raw orchestration.sequence is also exposed as an output so it can
         # be shown unquantized (proportional notation) by the Sequence Viewer.
         score = m5.Score.from_sequence(orchestration.sequence)
-        score_image = _render_score_to_image(score.score)
 
         if orchestration.audio is None:
             raise RuntimeError(
@@ -414,16 +375,9 @@ class OrchideaNode(io.ComfyNode):
                 "can happen if the constraints were too strict. Try reducing the "
                 "partials filtering or including more dynamics and playing styles."
             )
-        waveform_out = orchestration.audio.waveform
-        if waveform_out.ndim == 1:
-            waveform_out = waveform_out[None,: ]  # (frames,) -> (frames, 1)
-        audio_out = {
-            "waveform": torch.from_numpy(
-                np.ascontiguousarray(waveform_out.T)
-            ).unsqueeze(0),
-            "sample_rate": orchestration.audio.sample_rate,
-        }
-        return io.NodeOutput(score, score_image, audio_out, orchestration.sequence)
+        return io.NodeOutput(
+            score, _to_comfy_audio(orchestration.audio), orchestration.sequence
+        )
 
 
 class ScoreViewer(io.ComfyNode):
@@ -541,6 +495,97 @@ class LoadScore(io.ComfyNode):
         return io.NodeOutput(m5.Score.from_file(path))
 
 
+class SequenceToAudio(io.ComfyNode):
+    """Render an m5.Sequence to audio.
+
+    Every event carrying audio in its ``audio`` field (e.g. the instrument
+    samples an Orchidea orchestration picked) is mixed in at its onset, playing
+    for at most the event's duration: longer audio is cut to fit the event.
+    """
+
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="m5_SequenceToAudio",
+            display_name="Sequence to Audio",
+            category="audio",
+            inputs=[
+                m5Sequence.Input("sequence"),
+                io.Boolean.Input(
+                    "normalize",
+                    default=True,
+                    label_on="on",
+                    label_off="off",
+                    tooltip=(
+                        "Scale the mix down to full scale if summing the events "
+                        "makes it clip. Off leaves the raw sum untouched."
+                    ),
+                ),
+            ],
+            outputs=[io.Audio.Output("audio")],
+        )
+
+    @classmethod
+    def execute(cls, sequence, normalize: bool) -> io.NodeOutput:
+        rendered = m5.render_sequence(sequence, normalize=normalize)
+        return io.NodeOutput(_to_comfy_audio(rendered))
+
+
+def _write_preview_audio(audio: m5.Audio) -> dict:
+    """Write an m5.Audio to ComfyUI's temp directory as FLAC for the frontend to
+    play, returning the ``{filename, subfolder, type}`` reference that the /view
+    route resolves.
+
+    Samples are clipped to [-1, 1] first: libsndfile converts float to integer
+    PCM without clipping by default, so an out-of-range sample would wrap
+    around into a loud click instead of saturating.
+    """
+    temp_dir = folder_paths.get_temp_directory()
+    os.makedirs(temp_dir, exist_ok=True)
+    filename = f"m5_playback_{uuid.uuid4().hex[:12]}.flac"
+    waveform = np.clip(audio.waveform, -1.0, 1.0)
+    m5.Audio(waveform=waveform, sample_rate=audio.sample_rate).write(
+        os.path.join(temp_dir, filename)
+    )
+    return {"filename": filename, "subfolder": "", "type": "temp"}
+
+
+class AudioPlayback(io.ComfyNode):
+    """Play audio inside the node, with a waveform view, a scrubbable playhead
+    and an optional spectrogram.
+
+    Takes a ComfyUI AUDIO (e.g. Load Audio's output) and passes it on unchanged.
+    The waveform, spectrogram, playback and scrubbing are all done by the
+    frontend widget (js/audio-playback.js).
+    """
+
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="m5_AudioPlayback",
+            display_name="Audio Playback",
+            category="audio",
+            inputs=[
+                io.Audio.Input(
+                    "audio",
+                    tooltip="Audio to play (e.g. from Load Audio or Orchidea).",
+                ),
+            ],
+            outputs=[io.Audio.Output("audio")],
+            # Always execute and deliver the returned `ui` to the frontend, even
+            # when nothing downstream consumes the audio output.
+            is_output_node=True,
+        )
+
+    @classmethod
+    def execute(cls, audio: io.Audio.Type) -> io.NodeOutput:
+        # The frontend reads message.playback_audio[0]. (Deliberately not the
+        # "audio" key: ComfyUI's builtin audio extension would claim that and
+        # look for a player widget this node doesn't have.)
+        preview = _write_preview_audio(_to_m5_audio(audio))
+        return io.NodeOutput(audio, ui={"playback_audio": [preview]})
+
+
 class m5Extension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
@@ -548,7 +593,9 @@ class m5Extension(ComfyExtension):
             OrchideaNode,
             ScoreViewer,
             SequenceViewer,
+            SequenceToAudio,
             LoadScore,
+            AudioPlayback,
         ]
 
 
