@@ -1,0 +1,27 @@
+{
+  "name": "com5fy-ui",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Frontend (TypeScript + React) for the com5fy ComfyUI nodes. Built into ../js/.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc && vite build",
+    "watch": "vite build --watch --mode development",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "opensheetmusicdisplay": "1.9.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "vexflow": "4.2.5"
+  },
+  "devDependencies": {
+    "@comfyorg/comfyui-frontend-types": "1.43.18",
+    "@types/node": "^22.20.5",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.4.5"
+  }
+}

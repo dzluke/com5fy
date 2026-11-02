@@ -76,11 +76,12 @@ ComfyUI/                         upstream ComfyUI checkout (not a git repo here)
     ├── nodes/                   types.py (M5_SCORE, M5_SEQUENCE), boundary.py, convert.py, data.py, io.py
     ├── tests/                   pytest, calls each node's execute directly; test_workflows.py runs workflows/api
     ├── workflows/               UI-format workflows; api/ (API format) + run.py headless runner; inputs/ fixtures
-    └── js/                      score-viewer.js (OSMD), sequence-viewer.js, audio-playback.js; lib/ (OSMD, VexFlow)
+    ├── ui/                      TypeScript + React sources (Vite): score/ (OSMD), sequence/ (VexFlow), audio/
+    └── js/                      build output, committed: com5fy.js (the only extension entry) + chunks/*.mjs (OSMD, VexFlow, lazy)
 ```
 
-Note: `js/lib/` (the vendored OSMD and VexFlow bundles) is **not tracked in git** — the repo's `.gitignore` has a `lib/`
-rule — so a fresh clone of com5fy has broken score viewers. M0.6 fixes this by moving to npm-managed dependencies.
+Frontend: edit `ui/src/`, then `cd ui && npm ci && npm run build` (reproducible) and commit `js/`. ComfyUI imports every
+`*.js` under `js/`, so the build emits exactly one `.js`; the OSMD/VexFlow chunks are `.mjs` and load on first render.
 
 ### What exists
 
@@ -206,7 +207,9 @@ and the generated code is always shown in the node so the user can see what ran.
 Frontend code moves to **TypeScript + React**, based on the
 [ComfyUI React extension template](https://github.com/Comfy-Org/ComfyUI-React-Extension-Template):
 sources in `com5fy/ui/` (Vite build), npm-managed dependencies (OSMD, VexFlow, etc.), built output in `com5fy/js/`
-(committed, so users don't need Node to install). The existing plain-JS viewers are ported in M0.6.
+(committed, so users don't need Node to install). The plain-JS viewers were ported in M0.6. Pinned: OSMD 1.9.0,
+VexFlow 4.2.5 (same as the old vendored bundles), React 18.3.1, `@comfyorg/comfyui-frontend-types` 1.43.18 (matches the
+installed frontend; 1.57.6 is a broken publish), Vite 6.
 
 ### 2.8 Models and files
 
@@ -280,7 +283,7 @@ M13 = release work done along the way.
   *Depends on:* M0.3.
 - [x] **M0.5 Split `nodes.py`.** Move to a package (`com5fy/nodes/{types,boundary,convert,data,io}.py`) before it grows,
   keeping `__init__.py` exports and node IDs unchanged. *Depends on:* M0.3.
-- [ ] **M0.6 TypeScript/React frontend.** Set up `com5fy/ui/` from the React extension template (Vite, TS, npm deps for
+- [x] **M0.6 TypeScript/React frontend.** Set up `com5fy/ui/` from the React extension template (Vite, TS, npm deps for
   OSMD/VexFlow), build into `js/`, and port the score viewer, sequence viewer and audio playback with no change in
   behavior. Fix the `.gitignore` `lib/` rule so needed files are tracked.
   *Done when:* a fresh clone + `npm ci && npm run build` (or just the committed build) gives working viewers.
@@ -532,3 +535,10 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
   `api/smoke_viewers.json` (no deps) and `api/W1_audio_to_score.json` (slow+external; passes locally with TinySOL, ~1 s on
   the sine fixture). `tests/test_workflows.py` (slow) runs them through pytest plus two failure-reporting tests; conftest
   now treats `-m ""` as "run everything". Runner workflows are API format; UI-format W1 comes with M1.4. · Next: M0.6.
+- 2026-11-02 · M0.6 · (done by a subagent, reviewed here) `ui/` (Vite + TS + React, template's i18n/jest/eslint/sidebar
+  dropped) ports Score Viewer, Sequence Viewer and Audio Playback line for line; builds to `js/com5fy.js` + lazy
+  `js/chunks/*.mjs`; old hand-written JS and untracked `js/lib/` removed; `.gitignore` `lib/` anchored to `/lib/`.
+  `npm ci && npm run build` reproduces `js/` byte for byte; checked in the browser (score render + wheel scroll, audio
+  play/seek/spectrogram/serialize, sequence viewer with a hand-made payload; no console errors of ours). Viewers now unmount
+  their React roots on removal. · Open: in Vue-nodes mode the score node's `size[1]` sometimes stays 240 after fitting
+  (likely pre-existing); `npm audit` flags OSMD's optional `gl` dep (build-time only). Next: M1.

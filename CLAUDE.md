@@ -28,13 +28,22 @@ milestone first; tick the task and add a §9 session-log line when done. Project
 
 ## Frontend
 
-- Now: plain JS in `js/` (`WEB_DIRECTORY = "./js"`), one `app.registerExtension` per viewer:
-  `score-viewer.js` (OSMD), `sequence-viewer.js`, `audio-playback.js`. Reload the browser after JS changes;
-  restart ComfyUI after Python changes.
-- `js/lib/` (vendored OSMD + VexFlow) is **untracked** because `.gitignore` has a `lib/` rule, so a fresh clone has
-  broken score viewers. Don't commit around it ad hoc.
-- **M0.6** moves to TypeScript + React in `ui/` (Vite, npm deps), built with `npm run build` into `js/` (committed), and
-  fixes the `.gitignore` rule. See plan §2.9.
+- Sources: TypeScript + React in `ui/src/` (Vite; based on the ComfyUI React extension template). npm deps, pinned
+  exactly: `opensheetmusicdisplay` 1.9.0, `vexflow` 4.2.5, `react`/`react-dom` 18.3.1; types from
+  `@comfyorg/comfyui-frontend-types` (pinned to the installed `comfyui-frontend-package` version).
+- **Never edit `js/` by hand** — it is build output, committed so users need no Node. After changing `ui/src/`:
+  `cd ui && npm ci && npm run build` (or `npm run watch` while iterating), then reload the browser; commit `ui/` and
+  `js/` together. `npm run typecheck` runs `tsc` only.
+- ComfyUI imports **every `*.js`** under `WEB_DIRECTORY = "./js"`, so the build emits exactly one: `js/com5fy.js`
+  (React + all three viewers). OSMD and VexFlow are lazy chunks `js/chunks/*.mjs` (`.mjs` so ComfyUI doesn't import
+  them at startup), loaded on first render. Don't add other `.js` outputs.
+- Layout: `ui/src/main.ts` imports one `register.tsx` per viewer (`score/`, `sequence/`, `audio/`); each does one
+  `app.registerExtension`, mounts a React root into the node's DOM widget (`common/node.ts`: `chainCallback`,
+  `fitNodeHeight`, the `M5Node` subset of LGraphNode we use), and unmounts it in `onRemoved`. OSMD/VexFlow draw
+  imperatively into a childless React element (`common/ScrollPane.tsx`); the audio player's state/drawing lives in
+  `audio/Player.ts`, its controls in `audio/AudioPlayback.tsx`.
+- `/scripts/app.js` and `/scripts/api.js` are external (served by ComfyUI); `tsconfig.json` `paths` maps them to the
+  type stubs in `ui/src/types/`.
 
 ## Testing
 

@@ -57,6 +57,20 @@ uv run python main.py
 
 You will now be able to create custom nodes in ComfyUI that come from the com5fy package and use the m5 (mmmmm) library.
 
+## Frontend (developers only)
+
+The viewers' frontend (score, sequence and audio playback) is written in TypeScript + React in `ui/` and built into
+`js/`, which is committed, so using com5fy needs no Node.js. To change the frontend, edit `ui/src/` and rebuild
+(Node 20+):
+
+```bash
+cd ui
+npm ci
+npm run build   # writes js/com5fy.js and js/chunks/*.mjs
+```
+
+Then reload ComfyUI in the browser, and commit `ui/` and `js/` together.
+
 ## Orchidea setup
 
 To run audio to score with Orchidea, you will need to download a dataset from https://www.orch-idea.org/datasets/. It is recommended to start with the TinySOL database. The Orchidea orchestrate executable is bundled in the m5 package.
