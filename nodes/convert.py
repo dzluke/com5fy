@@ -4,8 +4,23 @@ from comfy_api.latest import io
 
 import m5
 
+from . import paths
 from .boundary import _to_comfy_audio, _to_m5_audio
 from .types import m5Score, m5Sequence
+
+
+# Shown in the database dropdown when no database is installed, so the workflow
+# still validates and the node can explain what to do when it runs.
+NO_DATABASE = "(no database found: see tooltip)"
+
+DATABASE_SETUP = (
+    "Orchidea needs a sound database. To install TinySOL (the small one Orchidea "
+    "ships for testing): download it from https://www.orch-idea.org/datasets/, unzip "
+    "it, and move (or symlink) the TinySOL folder, the one holding TinySOL.spectrum.db "
+    f"and the TinySOL/ samples folder, into {paths.ORCHIDEA_DB_DIR}/. Then restart "
+    "ComfyUI or press R to refresh the node definitions. Any database laid out as "
+    "<Name>.<features>.db next to a <Name>/ samples folder works."
+)
 
 
 class OrchideaNode(io.ComfyNode):
@@ -15,26 +30,26 @@ class OrchideaNode(io.ComfyNode):
 
     @classmethod
     def define_schema(cls) -> io.Schema:
+        databases = paths.orchidea_databases() or [NO_DATABASE]
         return io.Schema(
             node_id="m5_Orchidea",
             display_name="Orchidea",
             category="audio",
+            description=(
+                "Assisted orchestration with Orchidea: finds a combination of "
+                "instrument samples from a sound database that sounds like the "
+                "input audio, segment by segment. " + DATABASE_SETUP
+            ),
             inputs=[
-                io.Audio.Input("audio"),
-                io.String.Input(
-                    "db_files",
-                    default="",
+                io.Audio.Input("audio", tooltip="The target sound to orchestrate."),
+                io.Combo.Input(
+                    "database",
+                    options=databases,
+                    default=databases[0],
                     tooltip=(
-                        "Path to the Orchidea spectrum database file "
-                        "(e.g. /Datasets/TinySOL/TinySOL.spectrum.db)."
-                    ),
-                ),
-                io.String.Input(
-                    "sound_paths",
-                    default="",
-                    tooltip=(
-                        "Path to the folder containing the Orchidea sound samples "
-                        "(e.g. /Datasets/TinySOL/TinySOL)."
+                        "Sound database the orchestration is built from: the .db "
+                        "analysis files found in models/m5/orchidea_db. "
+                        + DATABASE_SETUP
                     ),
                 ),
                 io.String.Input(
@@ -55,13 +70,13 @@ class OrchideaNode(io.ComfyNode):
                     "onsets_threshold",
                     default=0.6,
                     min=0.0,
-                    max=1.0,
+                    max=2.0,
                     step=0.01,
                     tooltip=(
                         "Sensitivity of onset detection for dynamic (temporal) "
                         "orchestration. 0 segments at any minimal spectral variation; "
                         "raise it to reduce sensitivity. Above 1 there are no onsets "
-                        "and the target is treated as static."
+                        "and the target is treated as static (one chord)."
                     ),
                 ),
                 io.Float.Input(
@@ -104,6 +119,79 @@ class OrchideaNode(io.ComfyNode):
                         "only the strongest. Useful range is roughly -24 to -12."
                     ),
                 ),
+                io.String.Input(
+                    "styles",
+                    default="",
+                    tooltip=(
+                        "Only use samples with these playing styles (space-separated "
+                        "tags from the database, e.g. 'ord' or 'ord pizz_lv flatt'; "
+                        "grep-like patterns work). Blank = no filter."
+                    ),
+                ),
+                io.String.Input(
+                    "dynamics",
+                    default="",
+                    tooltip=(
+                        "Only use samples with these dynamics (space-separated, e.g. "
+                        "'pp p mf'; N = untagged). Blank = no filter."
+                    ),
+                ),
+                io.Boolean.Input(
+                    "reverb",
+                    default=True,
+                    label_on="on",
+                    label_off="off",
+                    tooltip=(
+                        "Add Orchidea's reverb to the rendered orchestration audio "
+                        "(not to the score or the Sequence). Off = dry samples."
+                    ),
+                ),
+                io.Float.Input(
+                    "onsets_timegate",
+                    default=0.1,
+                    min=0.01,
+                    max=10.0,
+                    step=0.01,
+                    advanced=True,
+                    tooltip=(
+                        "Minimum time in seconds between two detected onsets: raise "
+                        "it for fewer, longer segments."
+                    ),
+                ),
+                io.Combo.Input(
+                    "segmentation",
+                    options=["flux", "powerflux", "frames"],
+                    default="flux",
+                    advanced=True,
+                    tooltip=(
+                        "How the target is cut into segments: by spectral flux, by "
+                        "power-weighted flux, or into fixed frames."
+                    ),
+                ),
+                io.Int.Input(
+                    "pop_size",
+                    default=300,
+                    min=10,
+                    max=2000,
+                    step=10,
+                    advanced=True,
+                    tooltip=(
+                        "Population size of the genetic search. Bigger searches wider "
+                        "but runs longer; ~100 suits long dynamic targets, ~500 static ones."
+                    ),
+                ),
+                io.Int.Input(
+                    "max_epochs",
+                    default=300,
+                    min=10,
+                    max=2000,
+                    step=10,
+                    advanced=True,
+                    tooltip=(
+                        "Generations of the genetic search. More can find closer "
+                        "matches, at the cost of time."
+                    ),
+                ),
             ],
             outputs=[
                 m5Score.Output("score"),
@@ -133,14 +221,30 @@ class OrchideaNode(io.ComfyNode):
     def execute(
         cls,
         audio: io.Audio.Type,
-        db_files: str,
-        sound_paths: str,
+        database: str,
         orchestra: str,
         sparsity: float,
         partials_filtering: bool,
         partials_filtering_threshold_db: float,
         onsets_threshold: float,
+        styles: str = "",
+        dynamics: str = "",
+        reverb: bool = True,
+        onsets_timegate: float = 0.1,
+        segmentation: str = "flux",
+        pop_size: int = 300,
+        max_epochs: int = 300,
     ) -> io.NodeOutput:
+        db_path = paths.orchidea_database_path(database)
+        if db_path is None:
+            found = paths.orchidea_databases()
+            raise FileNotFoundError(
+                (f"Orchidea sound database {database!r} not found. " if database != NO_DATABASE
+                 else "No Orchidea sound database is installed. ")
+                + (f"Installed: {', '.join(found)}. " if found else "")
+                + DATABASE_SETUP
+            )
+        sound_db = m5.SoundDatabase.from_db_file(db_path)
         m5_audio = _to_m5_audio(audio)
 
         # These override the matching keys in the Orchidea config file.
@@ -149,22 +253,22 @@ class OrchideaNode(io.ComfyNode):
             "partials_filtering": partials_filtering,
             "partials_filtering_threshold_db": partials_filtering_threshold_db,
             "onsets_threshold": onsets_threshold,
+            "onsets_timegate": onsets_timegate,
+            "segmentation": segmentation,
+            "pop_size": pop_size,
+            "max_epochs": max_epochs,
+            "bypass_reverb": not reverb,
         }
         # The string widgets override their config keys only when non-blank: a
-        # blank widget must fall back to the value baked into the Orchidea
-        # config, NOT overwrite it with an empty value (the binary rejects an
-        # empty db_files/sound_paths/orchestra line as "invalid syntax"). The
-        # orchestra widget is multiline for readability, so collapse any
-        # whitespace (newlines included) into the single space-separated line
-        # the config expects.
-        if orchestra.strip():
-            parameters["orchestra"] = " ".join(orchestra.split())
-        if db_files.strip():
-            parameters["db_files"] = db_files.strip()
-        if sound_paths.strip():
-            parameters["sound_paths"] = sound_paths.strip()
+        # blank orchestra falls back to the config's, and blank styles/dynamics
+        # mean "no filter" (the config leaves those keys commented out). The
+        # binary rejects an empty value as "invalid syntax". Whitespace,
+        # newlines included, collapses into the single line the config expects.
+        for key, value in (("orchestra", orchestra), ("styles", styles), ("dynamics", dynamics)):
+            if value.strip():
+                parameters[key] = " ".join(value.split())
 
-        orchestration = m5.orchestrate(m5_audio, parameters=parameters)
+        orchestration = m5.orchestrate(m5_audio, parameters=parameters, database=sound_db)
         # orchestrate() returns the orchestration as an m5.Sequence;
         # build the music21-backed Score the viewer/image rendering needs.
         # The raw orchestration.sequence is also exposed as an output so it can

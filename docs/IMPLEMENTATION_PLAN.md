@@ -68,12 +68,13 @@ ComfyUI/                         upstream ComfyUI checkout (not a git repo here)
 │       ├── time.py              Event (duration ms + list-valued fields), Sequence ((start_ms, item) list, nestable)
 │       ├── score.py             Score (wraps music21.stream.Score), from_file, from_sequence (quantize), to_musicxml
 │       ├── render.py            render_sequence(Sequence) -> Audio (mixes audio carried by events)
-│       ├── orchidea.py          orchestrate(Audio, params) -> Orchestration(sequence, audio); connection.txt parser
+│       ├── orchidea.py          orchestrate(Audio, params, database) -> Orchestration; SoundDatabase; connection.txt parser
 │       ├── orch_config.txt      default Orchidea config
-│       └── bin/orchestrate      bundled Orchidea binary (macOS-only)
+│       └── bin/orchestrate      bundled Orchidea binary (universal macOS: arm64 + x86_64)
 └── custom_nodes/com5fy/         git repo — ComfyUI nodes using m5
     ├── docs/IMPLEMENTATION_PLAN.md   this file
-    ├── nodes/                   types.py (M5_SCORE, M5_SEQUENCE), boundary.py, convert.py, data.py, io.py
+    ├── nodes/                   types.py (M5_SCORE, M5_SEQUENCE), boundary.py, convert.py, data.py, io.py,
+    │                            paths.py (folder_paths: models/m5/orchidea_db)
     ├── tests/                   pytest, calls each node's execute directly; test_workflows.py runs workflows/api
     ├── workflows/               UI-format workflows; api/ (API format) + run.py headless runner; inputs/ fixtures
     ├── ui/                      TypeScript + React sources (Vite): score/ (OSMD), sequence/ (VexFlow), audio/
@@ -87,7 +88,7 @@ Frontend: edit `ui/src/`, then `cd ui && npm ci && npm run build` (reproducible)
 
 | Node (`node_id`)      | What it does |
 |-----------------------|--------------|
-| `m5_Orchidea`         | AUDIO → Score + Sequence + orchestrated AUDIO (audio → score via Orchidea) |
+| `m5_Orchidea`         | AUDIO → Score + Sequence + orchestrated AUDIO (audio → score via Orchidea); database dropdown from `models/m5/orchidea_db` |
 | `m5_LoadScore`        | file (MusicXML/MIDI/ABC…) → Score |
 | `m5_ScoreViewer`      | displays a Score as engraved notation (OSMD, single horizontal staff line) |
 | `m5_SequenceViewer`   | displays a Sequence as proportional, time-based notation |
@@ -102,7 +103,7 @@ converted by `_to_m5_audio` / `_to_comfy_audio` in `nodes/boundary.py`.
 
 m5 and com5fy have pytest suites (`mmmmm/tests/`, `custom_nodes/com5fy/tests/`). No MIDI, Descriptor, Control-data (Text/Number/BPF) types. No data-node history. No LLM integration.
 No score→audio, no editing nodes, no import/export beyond loading a score file, no Code / Custom nodes,
-no timeline, no model nodes. Orchidea binary is macOS-only and needs a sound database (TinySOL) installed by hand.
+no timeline, no model nodes. Orchidea's sound database (TinySOL) is still installed by hand into `models/m5/orchidea_db`.
 
 ---
 
@@ -216,6 +217,12 @@ installed frontend; 1.57.6 is a broken publish), Vite 6.
 Models live under ComfyUI's `models/` folder, registered through `folder_paths`
 (`models/m5/rave`, `models/m5/after`, `models/m5/loras`, `models/m5/llm`, `models/m5/orchidea_db`).
 Exported files go to ComfyUI's `output/`; imported files come from `input/`.
+Registration lives in `com5fy/nodes/paths.py`, which also creates the default folders.
+
+An Orchidea database (M1.2) is a `<Name>.<features>.db` analysis file with its `<Name>/` samples folder next to it
+(Orchidea's own dataset layout); the node's dropdown lists every `.db` file under `orchidea_db` (spectrum ones first)
+and `m5.SoundDatabase.from_db_file` infers the samples folder (falling back to the `.db` file's folder). The bundled
+`orch_config.txt` keeps placeholder database paths; the node always passes a database.
 
 ---
 
@@ -290,13 +297,15 @@ M13 = release work done along the way.
 
 ### M1 — Finish Phase 1: audio → score with Orchidea (W1)
 
-- [~] **M1.1 Orchidea node.** Exists. Remaining: expose the most useful config keys as typed inputs with sane ranges,
+- [x] **M1.1 Orchidea node.** Exists. Remaining: expose the most useful config keys as typed inputs with sane ranges,
   clear error when the sound database is missing, document TinySOL setup in the node tooltip.
-- [ ] **M1.2 Sound database location.** Register `models/m5/orchidea_db` with `folder_paths`; the node picks a database
+- [x] **M1.2 Sound database location.** Register `models/m5/orchidea_db` with `folder_paths`; the node picks a database
   from a dropdown instead of a path baked into `orch_config.txt`.
 - [x] **M1.3 Orchidea portability.** Not needed: the target is M-series macOS only (user decision 2026-11-02).
   Just check the bundled binary runs natively on Apple Silicon (not under Rosetta) and fail clearly on other platforms.
-- [ ] **M1.4 W1 end to end.** W1 workflow saved and passing in the runner (marked `external` since it needs Orchidea).
+  Checked in M1: universal binary with an arm64 slice (tested); forced to arm64 with `arch -arm64` when Python itself
+  runs under Rosetta; clear error off macOS unless `ORCHIDEA_EXECUTABLE` is set.
+- [x] **M1.4 W1 end to end.** W1 workflow saved and passing in the runner (marked `external` since it needs Orchidea).
   *Depends on:* M0.4, M1.1, M1.2.
 
 ### M2 — Complete the data model
@@ -480,8 +489,9 @@ What's below is still missing. A session that reaches one of these should ask th
 
 **Inputs only the user or other teams can provide**
 
-1. ~~Orchidea sound database location~~ — on the dev machine TinySOL is at `/Users/luke/Orchidea/TinySOL`, set in a
-   local (uncommitted) edit of `m5/orch_config.txt`. M1.2 replaces this with a `models/m5/orchidea_db` dropdown.
+1. ~~Orchidea sound database location~~ — done in M1.2: `models/m5/orchidea_db` dropdown. On the dev machine
+   `models/m5/orchidea_db/TinySOL` is a symlink to `/Users/luke/Orchidea/TinySOL`; the old local edit of
+   `m5/orch_config.txt` is no longer needed.
 2. AFTER code and checkpoints, RAVE models, and the Analyse-Synthèse audio-editing model (M6.1, M6.3, M9).
 3. Which GGUF model(s) to use by default with llama.cpp, and how much RAM the target Macs have.
 4. Test audio and scores that are musically meaningful for the composers (not just sine waves).
@@ -542,3 +552,12 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
   play/seek/spectrogram/serialize, sequence viewer with a hand-made payload; no console errors of ours). Viewers now unmount
   their React roots on removal. · Open: in Vue-nodes mode the score node's `size[1]` sometimes stays 240 after fitting
   (likely pre-existing); `npm audit` flags OSMD's optional `gl` dep (build-time only). Next: M1.
+- 2026-11-02 · M1.1–M1.4 · m5: `SoundDatabase` (`.db` file + inferred samples folder), `orchestrate(..., database=)`,
+  missing-database check before running the binary (it otherwise exits 0 with no output), clear error off macOS,
+  `arch -arm64` under Rosetta; bundled binary confirmed universal with an arm64 slice. com5fy: `nodes/paths.py` registers
+  `models/m5/orchidea_db`; Orchidea's `db_files`/`sound_paths` strings replaced by a `database` dropdown (placeholder +
+  setup instructions when empty); new inputs styles, dynamics, reverb, and advanced onsets_timegate, segmentation,
+  pop_size, max_epochs; TinySOL setup in description/tooltip and README. Runner: `expect_outputs` (W1 must fill all four
+  viewers/players). `workflows/M1.4_w1_audio_to_score.json` checked in the browser; all tests pass with the committed
+  (unedited) `orch_config.txt`. · Open: no musically meaningful shipped test audio yet (§8.4); ranges/defaults want
+  composer feedback. Next: M2.

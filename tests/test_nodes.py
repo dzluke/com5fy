@@ -11,6 +11,8 @@ import folder_paths
 import m5
 
 import custom_nodes.com5fy as com5fy
+from custom_nodes.com5fy.nodes import paths
+from custom_nodes.com5fy.nodes.convert import NO_DATABASE
 from custom_nodes.com5fy.nodes.boundary import _to_comfy_audio, _to_m5_audio
 from custom_nodes.com5fy.nodes.data import _midi_to_name, _sequence_to_payload
 
@@ -182,21 +184,65 @@ class _FakeOrchestrate:
         self.result = m5.Orchestration(sequence=sequence, audio=audio)
         self.calls = []
 
-    def __call__(self, audio, parameters):
-        self.calls.append((audio, parameters))
+    def __call__(self, audio, parameters, database=None):
+        self.calls.append((audio, parameters, database))
         return self.result
+
+
+@pytest.fixture
+def orchidea_db(tmp_path, monkeypatch):
+    """A fake database folder registered as the only ``orchidea_db`` location:
+    ``Mini/Mini.spectrum.db`` + ``Mini/Mini/`` samples, and an mfcc analysis."""
+    root = tmp_path / "orchidea_db"
+    (root / "Mini" / "Mini").mkdir(parents=True)
+    (root / "Mini" / "Mini.spectrum.db").write_text("")
+    (root / "Mini" / "Mini.mfcc.db").write_text("")
+    (root / "Mini" / "Mini" / "ignored.wav").write_text("")
+    monkeypatch.setitem(folder_paths.folder_names_and_paths, paths.ORCHIDEA_DB, ([str(root)], {".db"}))
+    monkeypatch.setattr(folder_paths, "filename_list_cache", {})
+    return root
 
 
 def _orchidea_kwargs(audio, **overrides):
     kwargs = dict(
-        audio=audio, db_files="", sound_paths="", orchestra="", sparsity=0.01,
+        audio=audio, database="Mini/Mini.spectrum.db", orchestra="", sparsity=0.01,
         partials_filtering=False, partials_filtering_threshold_db=-12.0, onsets_threshold=0.6,
+        styles="", dynamics="", reverb=True, onsets_timegate=0.1, segmentation="flux",
+        pop_size=300, max_epochs=300,
     )
     kwargs.update(overrides)
     return kwargs
 
 
-def test_orchidea_outputs_score_audio_and_sequence(comfy_audio, sequence, monkeypatch):
+def test_orchidea_folder_is_registered():
+    assert paths.ORCHIDEA_DB in folder_paths.folder_names_and_paths
+    assert paths.ORCHIDEA_DB_DIR in folder_paths.get_folder_paths(paths.ORCHIDEA_DB)
+    assert paths.ORCHIDEA_DB_DIR.endswith("models/m5/orchidea_db")
+
+
+def test_orchidea_database_dropdown_lists_db_files_spectrum_first(orchidea_db):
+    schema = com5fy.OrchideaNode.define_schema()
+    database = next(i for i in schema.inputs if i.id == "database")
+    assert database.options == ["Mini/Mini.spectrum.db", "Mini/Mini.mfcc.db"]
+    assert database.default == "Mini/Mini.spectrum.db"
+    assert "TinySOL" in database.tooltip
+
+
+def test_orchidea_without_databases_shows_placeholder_and_explains(comfy_audio, tmp_path, monkeypatch):
+    monkeypatch.setitem(folder_paths.folder_names_and_paths, paths.ORCHIDEA_DB, ([str(tmp_path)], {".db"}))
+    monkeypatch.setattr(folder_paths, "filename_list_cache", {})
+    database = next(i for i in com5fy.OrchideaNode.define_schema().inputs if i.id == "database")
+    assert database.options == [NO_DATABASE]
+    with pytest.raises(FileNotFoundError, match="No Orchidea sound database is installed.*TinySOL.*orchidea_db"):
+        com5fy.OrchideaNode.execute(**_orchidea_kwargs(comfy_audio, database=NO_DATABASE))
+
+
+def test_orchidea_unknown_database_lists_installed_ones(comfy_audio, orchidea_db):
+    with pytest.raises(FileNotFoundError, match="'Gone.db' not found. Installed: Mini/Mini.spectrum.db"):
+        com5fy.OrchideaNode.execute(**_orchidea_kwargs(comfy_audio, database="Gone.db"))
+
+
+def test_orchidea_outputs_score_audio_and_sequence(comfy_audio, sequence, orchidea_db, monkeypatch):
     rendered = m5.Audio(np.zeros((1, 100), np.float32), 8000)
     fake = _FakeOrchestrate(sequence, rendered)
     monkeypatch.setattr(m5, "orchestrate", fake)
@@ -205,34 +251,40 @@ def test_orchidea_outputs_score_audio_and_sequence(comfy_audio, sequence, monkey
     assert isinstance(score, m5.Score)
     assert seq is sequence
     assert audio["waveform"].shape == (1, 1, 100)
-    (target, _), = fake.calls
+    (target, _, database), = fake.calls
     assert target.waveform.shape == (2, 4000)
+    assert database == m5.SoundDatabase(
+        db_file=orchidea_db / "Mini" / "Mini.spectrum.db", sound_path=orchidea_db / "Mini" / "Mini"
+    )
 
 
-def test_orchidea_blank_strings_keep_config_values(comfy_audio, sequence, monkeypatch):
+def test_orchidea_blank_strings_keep_config_values(comfy_audio, sequence, orchidea_db, monkeypatch):
     fake = _FakeOrchestrate(sequence, m5.Audio(np.zeros((1, 10), np.float32), 8000))
     monkeypatch.setattr(m5, "orchestrate", fake)
-    com5fy.OrchideaNode.execute(**_orchidea_kwargs(comfy_audio, db_files="  ", orchestra="\n"))
-    (_, params), = fake.calls
+    com5fy.OrchideaNode.execute(**_orchidea_kwargs(comfy_audio, orchestra="\n", styles=" "))
+    (_, params, _), = fake.calls
     assert params == {
         "sparsity": 0.01, "partials_filtering": False,
         "partials_filtering_threshold_db": -12.0, "onsets_threshold": 0.6,
+        "onsets_timegate": 0.1, "segmentation": "flux", "pop_size": 300, "max_epochs": 300,
+        "bypass_reverb": False,
     }
 
 
-def test_orchidea_strings_are_cleaned_and_passed(comfy_audio, sequence, monkeypatch):
+def test_orchidea_strings_are_cleaned_and_passed(comfy_audio, sequence, orchidea_db, monkeypatch):
     fake = _FakeOrchestrate(sequence, m5.Audio(np.zeros((1, 10), np.float32), 8000))
     monkeypatch.setattr(m5, "orchestrate", fake)
     com5fy.OrchideaNode.execute(**_orchidea_kwargs(
-        comfy_audio, db_files=" /db/x.spectrum.db ", sound_paths="/db/x\n", orchestra="Fl  Ob\nVn|Va",
+        comfy_audio, orchestra="Fl  Ob\nVn|Va", styles=" ord  pizz_lv ", dynamics="pp\np", reverb=False,
     ))
-    (_, params), = fake.calls
-    assert params["db_files"] == "/db/x.spectrum.db"
-    assert params["sound_paths"] == "/db/x"
+    (_, params, _), = fake.calls
     assert params["orchestra"] == "Fl Ob Vn|Va"
+    assert params["styles"] == "ord pizz_lv"
+    assert params["dynamics"] == "pp p"
+    assert params["bypass_reverb"] is True
 
 
-def test_orchidea_without_audio_realization_raises(comfy_audio, sequence, monkeypatch):
+def test_orchidea_without_audio_realization_raises(comfy_audio, sequence, orchidea_db, monkeypatch):
     monkeypatch.setattr(m5, "orchestrate", _FakeOrchestrate(sequence, None))
     with pytest.raises(RuntimeError, match="no audio realization"):
         com5fy.OrchideaNode.execute(**_orchidea_kwargs(comfy_audio))

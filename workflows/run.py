@@ -54,12 +54,18 @@ class Workflow:
     prompt: dict
     description: str = ""
     markers: list[str] = field(default_factory=list)
+    # Node ids that must send a ui payload (e.g. every viewer): a run where one of
+    # them shows nothing fails even though ComfyUI reports success.
+    expect_outputs: list[str] = field(default_factory=list)
 
     @classmethod
     def load(cls, path: Path) -> "Workflow":
         data = json.loads(path.read_text())
         meta = data.pop("m5", {})
-        return cls(path.stem, data, meta.get("description", ""), list(meta.get("markers", [])))
+        return cls(
+            path.stem, data, meta.get("description", ""), list(meta.get("markers", [])),
+            [str(n) for n in meta.get("expect_outputs", [])],
+        )
 
 
 @dataclass
@@ -148,7 +154,7 @@ def comfy_server(url: str | None = None, startup_timeout: float = 120.0, log_pat
 
 def run_workflow(base: str, workflow: Workflow, timeout: float = 600.0) -> Result:
     """Queue one workflow and wait for it to finish. Fails on a validation error (the
-    server's ``node_errors``), an execution error, or a timeout."""
+    server's ``node_errors``), an execution error, a missing expected output, or a timeout."""
     start = time.monotonic()
 
     def fail(message: str) -> Result:
@@ -181,6 +187,10 @@ def run_workflow(base: str, workflow: Workflow, timeout: float = 600.0) -> Resul
         time.sleep(0.25)
 
     outputs = {node: sorted(ui) for node, ui in history.get("outputs", {}).items()}
+    missing = [n for n in workflow.expect_outputs if not outputs.get(n)]
+    if missing:
+        names = ", ".join(f"{workflow.prompt.get(n, {}).get('class_type', '?')} (node {n})" for n in missing)
+        return fail(f"finished, but sent no ui payload: {names}")
     return Result(workflow.name, True, time.monotonic() - start, outputs=outputs)
 
 

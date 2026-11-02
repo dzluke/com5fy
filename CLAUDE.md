@@ -13,7 +13,8 @@ milestone first; tick the task and add a §9 session-log line when done. Project
   and the classmethod `execute(...)` → `io.NodeOutput(...)`. Add the class to `m5Extension.get_node_list()`
   in `nodes/__init__.py` and export it from both `nodes/__init__.py` and the top-level `__init__.py`.
 - Where things go: `nodes/types.py` (custom types), `nodes/boundary.py` (ComfyUI ⇄ m5 conversions),
-  `nodes/convert.py` (conversion nodes), `nodes/data.py` (viewers, playback), `nodes/io.py` (file load/export).
+  `nodes/convert.py` (conversion nodes), `nodes/data.py` (viewers, playback), `nodes/io.py` (file load/export),
+  `nodes/paths.py` (`folder_paths` registration of `models/m5/*`, e.g. `orchidea_db`).
   New groups (e.g. `edit.py`) get their own module. In `nodes/__init__.py`, ComfyUI's `io` is imported *after* the
   submodules, because importing `.io` rebinds the name `io` in the package.
 - Node ids are `m5_<Name>` (e.g. `m5_ScoreViewer`); never rename an existing id (it breaks saved workflows).

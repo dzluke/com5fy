@@ -73,4 +73,21 @@ Then reload ComfyUI in the browser, and commit `ui/` and `js/` together.
 
 ## Orchidea setup
 
-To run audio to score with Orchidea, you will need to download a dataset from https://www.orch-idea.org/datasets/. It is recommended to start with the TinySOL database. The Orchidea orchestrate executable is bundled in the m5 package.
+The Orchidea `orchestrate` executable is bundled in the m5 package (a universal macOS binary that runs natively on
+Apple Silicon; on other platforms set `ORCHIDEA_EXECUTABLE` to a binary you built). It needs a sound database, which
+you install by hand:
+
+1. Download one from https://www.orch-idea.org/datasets/. Start with **TinySOL**.
+2. Unzip it and move (or symlink) its folder into ComfyUI's `models/m5/orchidea_db/` (created on first start):
+
+   ```bash
+   # from the ComfyUI root
+   ln -s /path/to/TinySOL models/m5/orchidea_db/TinySOL
+   ```
+
+   A database is a `<Name>.<features>.db` analysis file with the `<Name>/` samples folder next to it, so this gives
+   `models/m5/orchidea_db/TinySOL/TinySOL.spectrum.db` and `.../TinySOL/TinySOL/{Brass,Strings,Winds}`.
+   Other locations can be added under the key `orchidea_db` in ComfyUI's `extra_model_paths.yaml`.
+3. Restart ComfyUI (or press R in the browser) and pick it in the Orchidea node's `database` dropdown.
+
+The other Orchidea settings come from m5's `orch_config.txt` unless the node overrides them.

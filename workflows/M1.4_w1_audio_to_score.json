@@ -1,0 +1,535 @@
+{
+  "id": "5f6b1c1e-0a1b-4c4e-9d1a-31a4e0000014",
+  "revision": 0,
+  "last_node_id": 8,
+  "last_link_id": 12,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadAudio",
+      "pos": [
+        60,
+        80
+      ],
+      "size": [
+        282.796875,
+        152
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "audio",
+          "name": "audio",
+          "type": "COMBO",
+          "widget": {
+            "name": "audio"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "audioUI",
+          "name": "audioUI",
+          "type": "AUDIO_UI",
+          "widget": {
+            "name": "audioUI"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "choose file to upload",
+          "name": "upload",
+          "type": "AUDIOUPLOAD",
+          "widget": {
+            "name": "upload"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "AUDIO",
+          "name": "AUDIO",
+          "type": "AUDIO",
+          "links": [
+            7
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadAudio"
+      },
+      "widgets_values": [
+        "m5_sine_440_1s.wav",
+        null,
+        ""
+      ]
+    },
+    {
+      "id": 2,
+      "type": "m5_Orchidea",
+      "pos": [
+        380,
+        80
+      ],
+      "size": [
+        400,
+        490.65625
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "audio",
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 7
+        },
+        {
+          "localized_name": "database",
+          "name": "database",
+          "type": "COMBO",
+          "widget": {
+            "name": "database"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "orchestra",
+          "name": "orchestra",
+          "type": "STRING",
+          "widget": {
+            "name": "orchestra"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "onsets_threshold",
+          "name": "onsets_threshold",
+          "type": "FLOAT",
+          "widget": {
+            "name": "onsets_threshold"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "sparsity",
+          "name": "sparsity",
+          "type": "FLOAT",
+          "widget": {
+            "name": "sparsity"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "partials_filtering",
+          "name": "partials_filtering",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "partials_filtering"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "partials_filtering_threshold_db",
+          "name": "partials_filtering_threshold_db",
+          "type": "FLOAT",
+          "widget": {
+            "name": "partials_filtering_threshold_db"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "styles",
+          "name": "styles",
+          "type": "STRING",
+          "widget": {
+            "name": "styles"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "dynamics",
+          "name": "dynamics",
+          "type": "STRING",
+          "widget": {
+            "name": "dynamics"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "reverb",
+          "name": "reverb",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "reverb"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "onsets_timegate",
+          "name": "onsets_timegate",
+          "type": "FLOAT",
+          "widget": {
+            "name": "onsets_timegate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "segmentation",
+          "name": "segmentation",
+          "type": "COMBO",
+          "widget": {
+            "name": "segmentation"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "pop_size",
+          "name": "pop_size",
+          "type": "INT",
+          "widget": {
+            "name": "pop_size"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "max_epochs",
+          "name": "max_epochs",
+          "type": "INT",
+          "widget": {
+            "name": "max_epochs"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "score",
+          "name": "score",
+          "type": "M5_SCORE",
+          "links": [
+            8
+          ]
+        },
+        {
+          "localized_name": "audio",
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [
+            10
+          ]
+        },
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "M5_SEQUENCE",
+          "links": [
+            9,
+            11
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "m5_Orchidea"
+      },
+      "widgets_values": [
+        "TinySOL/TinySOL.spectrum.db",
+        "Fl Fl Ob Ob ClBb ClBb Bn Bn Hn Hn TpC TpC Tbn Tbn BTb Vn Vn Va Va Vc Vc Cb Cb",
+        0.6,
+        0.001,
+        false,
+        -12,
+        "",
+        "",
+        true,
+        0.1,
+        "flux",
+        300,
+        300
+      ]
+    },
+    {
+      "id": 3,
+      "type": "m5_ScoreViewer",
+      "pos": [
+        820,
+        80
+      ],
+      "size": [
+        620,
+        721.796875
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "score",
+          "name": "score",
+          "type": "M5_SCORE",
+          "link": 8
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "m5_ScoreViewer"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 4,
+      "type": "m5_SequenceViewer",
+      "pos": [
+        1480,
+        80
+      ],
+      "size": [
+        620,
+        488
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "M5_SEQUENCE",
+          "link": 9
+        },
+        {
+          "localized_name": "pixels_per_second",
+          "name": "pixels_per_second",
+          "type": "FLOAT",
+          "widget": {
+            "name": "pixels_per_second"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "m5_SequenceViewer"
+      },
+      "widgets_values": [
+        120,
+        ""
+      ]
+    },
+    {
+      "id": 5,
+      "type": "m5_AudioPlayback",
+      "pos": [
+        1480,
+        640
+      ],
+      "size": [
+        620,
+        240
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "audio",
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "audio",
+          "name": "audio",
+          "type": "AUDIO",
+          "links": null
+        }
+      ],
+      "title": "Orchidea realization (connection.wav)",
+      "properties": {
+        "Node name for S&R": "m5_AudioPlayback"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 6,
+      "type": "m5_SequenceToAudio",
+      "pos": [
+        1480,
+        950
+      ],
+      "size": [
+        270,
+        84
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "M5_SEQUENCE",
+          "link": 11
+        },
+        {
+          "localized_name": "normalize",
+          "name": "normalize",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "normalize"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "audio",
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "m5_SequenceToAudio"
+      },
+      "widgets_values": [
+        true
+      ]
+    },
+    {
+      "id": 7,
+      "type": "m5_AudioPlayback",
+      "pos": [
+        1480,
+        1070
+      ],
+      "size": [
+        620,
+        240
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "audio",
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 12
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "audio",
+          "name": "audio",
+          "type": "AUDIO",
+          "links": null
+        }
+      ],
+      "title": "Sequence to Audio (samples remixed by m5)",
+      "properties": {
+        "Node name for S&R": "m5_AudioPlayback"
+      },
+      "widgets_values": [
+        ""
+      ]
+    },
+    {
+      "id": 8,
+      "type": "Note",
+      "pos": [
+        60,
+        340
+      ],
+      "size": [
+        300,
+        600
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "M1.4 · W1: audio → score with Orchidea",
+      "properties": {},
+      "widgets_values": [
+        "W1 (Phase 1): a sound is orchestrated by Orchidea into a score for ensemble.\n\nNeeds: TinySOL in models/m5/orchidea_db/TinySOL (folder holding TinySOL.spectrum.db and the TinySOL/ samples). Download: https://www.orch-idea.org/datasets/ (a symlink works). Restart ComfyUI or press R, then pick it in Orchidea's \"database\" dropdown.\n\nPress Run (~1 s on this 1 s 440 Hz sine). Look at:\n1. Score Viewer: the orchestration quantized to a score, one staff per instrument, notes around A4.\n2. Sequence Viewer: the same notes unquantized, at their real onset times.\n3. The two players: Orchidea's own rendering (with reverb) and m5's mix of the same samples (dry). They should sound alike.\n\nTry: change \"orchestra\" (e.g. \"Fl Ob ClBb Vn Vc\"), set styles to \"ord\" or dynamics to \"pp p\", raise sparsity to 0.1 for fewer instruments, turn reverb off. \"Show advanced inputs\" reveals segmentation, onsets_timegate, pop_size, max_epochs. Swap the sine for any WAV in input/ (e.g. a chord or a bell) via Load Audio."
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
+    }
+  ],
+  "links": [
+    [
+      7,
+      1,
+      0,
+      2,
+      0,
+      "AUDIO"
+    ],
+    [
+      8,
+      2,
+      0,
+      3,
+      0,
+      "M5_SCORE"
+    ],
+    [
+      9,
+      2,
+      2,
+      4,
+      0,
+      "M5_SEQUENCE"
+    ],
+    [
+      10,
+      2,
+      1,
+      5,
+      0,
+      "AUDIO"
+    ],
+    [
+      11,
+      2,
+      2,
+      6,
+      0,
+      "M5_SEQUENCE"
+    ],
+    [
+      12,
+      6,
+      0,
+      7,
+      0,
+      "AUDIO"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.55,
+      "offset": [
+        0,
+        0
+      ]
+    }
+  },
+  "version": 0.4
+}

@@ -1,20 +1,27 @@
 {
   "m5": {
-    "description": "W1 (Phase 1): Load Audio -> Orchidea -> Score Viewer + Sequence Viewer, and the orchestration rendered back to audio (Orchidea's own realization and Sequence to Audio) -> Audio Playback. Needs Orchidea's sound database (db_files/sound_paths blank = the values in m5's orch_config.txt).",
-    "markers": ["slow", "external"]
+    "description": "W1 (Phase 1): Load Audio -> Orchidea -> Score Viewer + Sequence Viewer, and the orchestration rendered back to audio (Orchidea's own realization and Sequence to Audio) -> Audio Playback. Needs TinySOL in models/m5/orchidea_db/TinySOL (see the README).",
+    "markers": ["slow", "external"],
+    "expect_outputs": ["3", "4", "5", "7"]
   },
   "1": {"class_type": "LoadAudio", "inputs": {"audio": "m5_sine_440_1s.wav"}},
   "2": {
     "class_type": "m5_Orchidea",
     "inputs": {
       "audio": ["1", 0],
-      "db_files": "",
-      "sound_paths": "",
+      "database": "TinySOL/TinySOL.spectrum.db",
       "orchestra": "Fl Fl Ob Ob ClBb ClBb Bn Bn Hn Hn TpC TpC Tbn Tbn BTb Vn Vn Va Va Vc Vc Cb Cb",
       "onsets_threshold": 0.6,
       "sparsity": 0.001,
       "partials_filtering": false,
-      "partials_filtering_threshold_db": -12.0
+      "partials_filtering_threshold_db": -12.0,
+      "styles": "",
+      "dynamics": "",
+      "reverb": true,
+      "onsets_timegate": 0.1,
+      "segmentation": "flux",
+      "pop_size": 300,
+      "max_epochs": 300
     }
   },
   "3": {"class_type": "m5_ScoreViewer", "inputs": {"score": ["2", 0]}},

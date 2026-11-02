@@ -47,3 +47,14 @@ def test_execution_error_is_reported(server):
     result = runner.run_workflow(server, bad)
     assert not result.ok
     assert "m5_LoadScore (node 1)" in result.message
+
+
+def test_missing_expected_output_is_reported(server):
+    # Load Score sends no ui payload, so expecting one from it must fail the run.
+    bad = runner.Workflow("bad", {
+        "1": {"class_type": "m5_LoadScore", "inputs": {"path": "custom_nodes/com5fy/tests/data/four_bars.musicxml"}},
+        "2": {"class_type": "m5_ScoreViewer", "inputs": {"score": ["1", 0]}},
+    }, expect_outputs=["1", "2"])
+    result = runner.run_workflow(server, bad)
+    assert not result.ok
+    assert "sent no ui payload: m5_LoadScore (node 1)" in result.message
