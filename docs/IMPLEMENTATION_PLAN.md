@@ -25,11 +25,13 @@ Every Claude session working on this project should:
 6. **Update this file**: tick the task, add one line to the §9 Session log (date, task ID, what changed, anything left open), and write down any new decision in §2.
 7. **Commit and push** in each repo that changed (`mmmmm` and `com5fy` are separate git repos; the ComfyUI folder itself is not a repo).
    The user has given standing permission to commit and push to both whenever a task is finished.
-8. **Hand off a test workflow** (required at the end of every session — see below).
+8. **Hand off a test workflow** whenever the session added a new feature (see below).
 
-### End-of-session handoff (required)
+### New-feature handoff (required)
 
-Each session implements one aspect of the system and ends by giving the user something to try by hand:
+Whenever a session adds a new user-facing feature (a new node, type, conversion, UI, or a visible change in behavior),
+it ends by giving the user something to try by hand. Sessions that only do internal work (tests, refactors,
+docs, tooling) skip this and just summarize what changed.
 
 1. **A test workflow** saved as `custom_nodes/com5fy/workflows/<task-id>_<short-name>.json` (ComfyUI UI format, so it
    can be dragged onto the canvas or opened from the Workflows sidebar). It must exercise what the session built,
@@ -226,7 +228,7 @@ Exported files go to ComfyUI's `output/`; imported files come from `input/`.
   Tests needing Orchidea / a model / an LLM are marked `@pytest.mark.slow` or `@pytest.mark.external` and skipped by default.
   com5fy gets `custom_nodes/com5fy/tests/` that import the node classes and call `execute` directly.
 - **End-to-end checks**: example workflows saved as JSON in `custom_nodes/com5fy/workflows/`,
-  runnable headlessly through ComfyUI's `/prompt` API by a small script. Every session adds one (see §0 handoff).
+  runnable headlessly through ComfyUI's `/prompt` API by a small script. Every new feature adds one (see §0 handoff).
 - **Frontend**: TypeScript + React in `com5fy/ui/`, built with `npm run build` into `com5fy/js/` (see §2.9).
 - Optional heavy dependencies (AFTER, RAVE, LLM libraries) are optional extras in `mmmmm/pyproject.toml`
   and imported lazily, so the base install stays light.
@@ -503,3 +505,4 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
 - 2026-11-02 · — · Created this plan from the technical spec and the existing m5/com5fy code. · Waiting on answers to §8.
 - 2026-11-02 · — · Moved plan to `com5fy/docs/`; recorded the user's answers (§2); added the end-of-session test-workflow
   handoff (§0); added M0.6 (TS/React); macOS-only; MuseScore/Ableton/Premiere priority; listed remaining gaps (§8). · Next: M0.1.
+- 2026-11-02 · — · Test-workflow handoff now required per new feature, not per session. · Next: M0.1.
