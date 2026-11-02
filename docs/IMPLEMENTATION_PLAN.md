@@ -97,7 +97,7 @@ converted by `_to_m5_audio` / `_to_comfy_audio` in `nodes.py`.
 
 ### What's missing (big picture)
 
-No tests. No MIDI, Descriptor, Control-data (Text/Number/BPF) types. No data-node history. No LLM integration.
+m5 has a pytest suite (`mmmmm/tests/`); com5fy has none yet. No MIDI, Descriptor, Control-data (Text/Number/BPF) types. No data-node history. No LLM integration.
 No score→audio, no editing nodes, no import/export beyond loading a score file, no Code / Custom nodes,
 no timeline, no model nodes. Orchidea binary is macOS-only and needs a sound database (TinySOL) installed by hand.
 
@@ -267,7 +267,7 @@ M13 = release work done along the way.
 - [x] **M0.1 Project guide for Claude.** Add a `CLAUDE.md` at the ComfyUI root (and short ones in `mmmmm/` and `com5fy/`)
   pointing to the spec and this plan, with setup/test commands and the conventions in §3.
   *Done when:* a fresh session can find the plan, set up the env and run the tests from CLAUDE.md alone.
-- [ ] **M0.2 Test setup for m5.** `mmmmm/tests/` with pytest config, markers (`slow`, `external`), tiny fixtures
+- [x] **M0.2 Test setup for m5.** `mmmmm/tests/` with pytest config, markers (`slow`, `external`), tiny fixtures
   (a 1 s sine WAV, a 4-bar MusicXML, a saved Orchidea `connection.txt`). Tests for `Audio`, `Event`, `Sequence`,
   `Score.from_sequence` (quantization), `render_sequence`, and the `connection.txt` parser.
   *Done when:* `uv run pytest` in `mmmmm/` passes with no Orchidea/GPU.
@@ -475,7 +475,8 @@ What's below is still missing. A session that reaches one of these should ask th
 
 **Inputs only the user or other teams can provide**
 
-1. Orchidea sound database: where TinySOL (or another dataset) is installed on the dev machine.
+1. ~~Orchidea sound database location~~ — on the dev machine TinySOL is at `/Users/luke/Orchidea/TinySOL`, set in a
+   local (uncommitted) edit of `m5/orch_config.txt`. M1.2 replaces this with a `models/m5/orchidea_db` dropdown.
 2. AFTER code and checkpoints, RAVE models, and the Analyse-Synthèse audio-editing model (M6.1, M6.3, M9).
 3. Which GGUF model(s) to use by default with llama.cpp, and how much RAM the target Macs have.
 4. Test audio and scores that are musically meaningful for the composers (not just sine waves).
@@ -510,3 +511,8 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
   boundary helper name in §1 (`_to_comfy_audio`). Checked setup/run commands (`--quick-test-for-ci` loads com5fy). ·
   pytest isn't in the env yet (`uv run --with pytest` until M0.2 adds it); existing nodes use categories `audio`/`music`,
   not `m5/…` (§3). Next: M0.2.
+- 2026-11-02 · M0.2 · `mmmmm/tests/`: pytest as a `dev` dependency group, config + `slow`/`external` markers in
+  `pyproject.toml` (skipped by default), fixtures in `tests/data/` (1 s sine WAV, 4-bar MusicXML, hand-written
+  `connection.txt` + tiny samples under `sounds/`, `make_fixtures.py`). 52 tests for Audio, Event, Sequence, Score
+  (quantize, from_file, from_sequence), render_sequence, the connection parser/Sequence builder and config overrides;
+  one slow test runs the real binary (passes locally with TinySOL). No code changes needed. · Next: M0.3.
