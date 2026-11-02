@@ -7,21 +7,24 @@ return UI payloads. Core logic belongs in m5, not here.
 **What to work on and how:** [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) — read §0, §1, §3 and your
 milestone first; tick the task and add a §9 session-log line when done. Project overview and setup: `../../CLAUDE.md`.
 
-## Writing nodes (`nodes.py`)
+## Writing nodes (`nodes/`)
 
 - Use the `comfy_api.latest.io` schema API: subclass `io.ComfyNode`, implement `define_schema()` → `io.Schema(...)`
   and the classmethod `execute(...)` → `io.NodeOutput(...)`. Add the class to `m5Extension.get_node_list()`
-  and export it from `__init__.py`.
+  in `nodes/__init__.py` and export it from both `nodes/__init__.py` and the top-level `__init__.py`.
+- Where things go: `nodes/types.py` (custom types), `nodes/boundary.py` (ComfyUI ⇄ m5 conversions),
+  `nodes/convert.py` (conversion nodes), `nodes/data.py` (viewers, playback), `nodes/io.py` (file load/export).
+  New groups (e.g. `edit.py`) get their own module. In `nodes/__init__.py`, ComfyUI's `io` is imported *after* the
+  submodules, because importing `.io` rebinds the name `io` in the package.
 - Node ids are `m5_<Name>` (e.g. `m5_ScoreViewer`); never rename an existing id (it breaks saved workflows).
   Plan §3 wants categories under `m5/…` (`m5/convert`, `m5/edit`, `m5/io`…); the existing nodes still use
   `audio` / `music`.
 - Custom types: `@io.comfytype(io_type="M5_…")` on an `io.ComfyTypeIO` subclass (`M5_SCORE`, `M5_SEQUENCE` so far),
   carrying the m5 object as-is.
 - Audio crosses node boundaries as ComfyUI's builtin `AUDIO` (`{"waveform": torch (B, C, T), "sample_rate"}`) so it
-  connects to Load/Save Audio. Convert only with `_to_m5_audio` / `_to_comfy_audio` in `nodes.py` — the only places
+  connects to Load/Save Audio. Convert only with `_to_m5_audio` / `_to_comfy_audio` in `nodes/boundary.py` — the only places
   that touch torch.
 - Display-only nodes set `is_output_node=True` and return `io.NodeOutput(ui={...})`; the JS reads `message.<key>[0]`.
-- `nodes.py` becomes a package in M0.5 (`nodes/{types,boundary,convert,data,io}.py`).
 
 ## Frontend
 

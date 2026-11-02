@@ -11,12 +11,8 @@ import folder_paths
 import m5
 
 import custom_nodes.com5fy as com5fy
-from custom_nodes.com5fy.nodes import (
-    _midi_to_name,
-    _sequence_to_payload,
-    _to_comfy_audio,
-    _to_m5_audio,
-)
+from custom_nodes.com5fy.nodes.boundary import _to_comfy_audio, _to_m5_audio
+from custom_nodes.com5fy.nodes.data import _midi_to_name, _sequence_to_payload
 
 NODE_IDS = {
     "m5_Orchidea",

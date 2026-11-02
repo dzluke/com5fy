@@ -73,7 +73,8 @@ ComfyUI/                         upstream ComfyUI checkout (not a git repo here)
 │       └── bin/orchestrate      bundled Orchidea binary (macOS-only)
 └── custom_nodes/com5fy/         git repo — ComfyUI nodes using m5
     ├── docs/IMPLEMENTATION_PLAN.md   this file
-    ├── nodes.py                 types M5_SCORE, M5_SEQUENCE; nodes listed below
+    ├── nodes/                   types.py (M5_SCORE, M5_SEQUENCE), boundary.py, convert.py, data.py, io.py
+    ├── tests/                   pytest, calls each node's execute directly
     └── js/                      score-viewer.js (OSMD), sequence-viewer.js, audio-playback.js; lib/ (OSMD, VexFlow)
 ```
 
@@ -93,7 +94,7 @@ rule — so a fresh clone of com5fy has broken score viewers. M0.6 fixes this by
 
 Nodes use the new `comfy_api.latest.io` schema API (`io.ComfyNode`, `define_schema`, `ComfyExtension`).
 Audio crosses the node boundary as ComfyUI's builtin `AUDIO` (`{"waveform": torch (B, C, T), "sample_rate"}`),
-converted by `_to_m5_audio` / `_to_comfy_audio` in `nodes.py`.
+converted by `_to_m5_audio` / `_to_comfy_audio` in `nodes/boundary.py`.
 
 ### What's missing (big picture)
 
@@ -276,7 +277,7 @@ M13 = release work done along the way.
 - [ ] **M0.4 Headless workflow runner.** `custom_nodes/com5fy/workflows/` + a script that starts/uses a ComfyUI server,
   posts a workflow (API format) to `/prompt`, and checks it finishes without errors. Save W1 as the first workflow.
   *Depends on:* M0.3.
-- [ ] **M0.5 Split `nodes.py`.** Move to a package (`com5fy/nodes/{types,boundary,convert,data,io}.py`) before it grows,
+- [x] **M0.5 Split `nodes.py`.** Move to a package (`com5fy/nodes/{types,boundary,convert,data,io}.py`) before it grows,
   keeping `__init__.py` exports and node IDs unchanged. *Depends on:* M0.3.
 - [ ] **M0.6 TypeScript/React frontend.** Set up `com5fy/ui/` from the React extension template (Vite, TS, npm deps for
   OSMD/VexFlow), build into `js/`, and port the score viewer, sequence viewer and audio playback with no change in
@@ -520,3 +521,7 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
   `custom_nodes.com5fy`), declares `slow`/`external` and skips them unless `-m` is given; fixtures (stereo sine AUDIO,
   nested Sequence, copy of the 4-bar MusicXML). 27 tests: extension node ids, AUDIO ⇄ m5.Audio helpers, Sequence Viewer
   payload, every node's `execute` (Orchidea with `m5.orchestrate` mocked). No code changes needed. · Next: M0.5, M0.4.
+- 2026-11-02 · M0.5 · `nodes.py` → `nodes/` package: `types` (M5_SCORE, M5_SEQUENCE), `boundary` (AUDIO ⇄ m5.Audio),
+  `convert` (Orchidea, Sequence to Audio), `data` (Score/Sequence Viewer, Audio Playback + payload helpers), `io`
+  (Load Score); `nodes/__init__.py` holds the extension. Code moved unchanged; node ids and top-level exports unchanged.
+  ComfyUI's `io` is imported after the submodules in `nodes/__init__.py` (importing `.io` rebinds the name). · Next: M0.4.
