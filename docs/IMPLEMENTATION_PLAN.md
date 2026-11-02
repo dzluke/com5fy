@@ -74,7 +74,8 @@ ComfyUI/                         upstream ComfyUI checkout (not a git repo here)
 └── custom_nodes/com5fy/         git repo — ComfyUI nodes using m5
     ├── docs/IMPLEMENTATION_PLAN.md   this file
     ├── nodes/                   types.py (M5_SCORE, M5_SEQUENCE), boundary.py, convert.py, data.py, io.py
-    ├── tests/                   pytest, calls each node's execute directly
+    ├── tests/                   pytest, calls each node's execute directly; test_workflows.py runs workflows/api
+    ├── workflows/               UI-format workflows; api/ (API format) + run.py headless runner; inputs/ fixtures
     └── js/                      score-viewer.js (OSMD), sequence-viewer.js, audio-playback.js; lib/ (OSMD, VexFlow)
 ```
 
@@ -274,7 +275,7 @@ M13 = release work done along the way.
   *Done when:* `uv run pytest` in `mmmmm/` passes with no Orchidea/GPU.
 - [x] **M0.3 Test setup for com5fy.** `custom_nodes/com5fy/tests/` that call each node's `execute` with fixtures,
   including the AUDIO ⇄ m5.Audio boundary helpers. *Depends on:* M0.2.
-- [ ] **M0.4 Headless workflow runner.** `custom_nodes/com5fy/workflows/` + a script that starts/uses a ComfyUI server,
+- [x] **M0.4 Headless workflow runner.** `custom_nodes/com5fy/workflows/` + a script that starts/uses a ComfyUI server,
   posts a workflow (API format) to `/prompt`, and checks it finishes without errors. Save W1 as the first workflow.
   *Depends on:* M0.3.
 - [x] **M0.5 Split `nodes.py`.** Move to a package (`com5fy/nodes/{types,boundary,convert,data,io}.py`) before it grows,
@@ -525,3 +526,9 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
   `convert` (Orchidea, Sequence to Audio), `data` (Score/Sequence Viewer, Audio Playback + payload helpers), `io`
   (Load Score); `nodes/__init__.py` holds the extension. Code moved unchanged; node ids and top-level exports unchanged.
   ComfyUI's `io` is imported after the submodules in `nodes/__init__.py` (importing `.io` rebinds the name). · Next: M0.4.
+- 2026-11-02 · M0.4 · `workflows/run.py` (stdlib only): starts ComfyUI on a free port (or uses `--server`), copies
+  `workflows/inputs/` into `input/`, posts each `workflows/api/*.json` to `/prompt`, polls `/history`, reports validation
+  and execution errors. Workflows carry `"m5": {"markers": [...]}`; slow/external skipped unless `--all`.
+  `api/smoke_viewers.json` (no deps) and `api/W1_audio_to_score.json` (slow+external; passes locally with TinySOL, ~1 s on
+  the sine fixture). `tests/test_workflows.py` (slow) runs them through pytest plus two failure-reporting tests; conftest
+  now treats `-m ""` as "run everything". Runner workflows are API format; UI-format W1 comes with M1.4. · Next: M0.6.

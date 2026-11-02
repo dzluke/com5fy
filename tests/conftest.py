@@ -33,8 +33,10 @@ def pytest_configure(config):
 
 
 def pytest_collection_modifyitems(config, items):
-    # Same default as m5 (plan §3): skip slow/external tests unless a -m expression is given.
-    if config.getoption("-m"):
+    # Same default as m5 (plan §3): skip slow/external tests unless a -m expression is
+    # given. Checks the command line rather than the option value so that -m "" (run
+    # everything) counts too.
+    if any(arg.startswith("-m") for arg in config.invocation_params.args):
         return
     skip = pytest.mark.skip(reason="slow/external: run with -m slow, -m external or -m ''")
     for item in items:

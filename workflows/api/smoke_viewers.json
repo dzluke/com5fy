@@ -1,0 +1,10 @@
+{
+  "m5": {
+    "description": "Every non-Orchidea node, no external dependencies: Load Score -> Score Viewer, Load Audio -> Audio Playback.",
+    "markers": []
+  },
+  "1": {"class_type": "m5_LoadScore", "inputs": {"path": "custom_nodes/com5fy/tests/data/four_bars.musicxml"}},
+  "2": {"class_type": "m5_ScoreViewer", "inputs": {"score": ["1", 0]}},
+  "3": {"class_type": "LoadAudio", "inputs": {"audio": "m5_sine_440_1s.wav"}},
+  "4": {"class_type": "m5_AudioPlayback", "inputs": {"audio": ["3", 0]}}
+}

@@ -1,0 +1,25 @@
+{
+  "m5": {
+    "description": "W1 (Phase 1): Load Audio -> Orchidea -> Score Viewer + Sequence Viewer, and the orchestration rendered back to audio (Orchidea's own realization and Sequence to Audio) -> Audio Playback. Needs Orchidea's sound database (db_files/sound_paths blank = the values in m5's orch_config.txt).",
+    "markers": ["slow", "external"]
+  },
+  "1": {"class_type": "LoadAudio", "inputs": {"audio": "m5_sine_440_1s.wav"}},
+  "2": {
+    "class_type": "m5_Orchidea",
+    "inputs": {
+      "audio": ["1", 0],
+      "db_files": "",
+      "sound_paths": "",
+      "orchestra": "Fl Fl Ob Ob ClBb ClBb Bn Bn Hn Hn TpC TpC Tbn Tbn BTb Vn Vn Va Va Vc Vc Cb Cb",
+      "onsets_threshold": 0.6,
+      "sparsity": 0.001,
+      "partials_filtering": false,
+      "partials_filtering_threshold_db": -12.0
+    }
+  },
+  "3": {"class_type": "m5_ScoreViewer", "inputs": {"score": ["2", 0]}},
+  "4": {"class_type": "m5_SequenceViewer", "inputs": {"sequence": ["2", 2], "pixels_per_second": 120.0}},
+  "5": {"class_type": "m5_AudioPlayback", "inputs": {"audio": ["2", 1]}},
+  "6": {"class_type": "m5_SequenceToAudio", "inputs": {"sequence": ["2", 2], "normalize": true}},
+  "7": {"class_type": "m5_AudioPlayback", "inputs": {"audio": ["6", 0]}}
+}
