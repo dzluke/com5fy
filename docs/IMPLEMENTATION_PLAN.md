@@ -93,7 +93,7 @@ rule — so a fresh clone of com5fy has broken score viewers. M0.6 fixes this by
 
 Nodes use the new `comfy_api.latest.io` schema API (`io.ComfyNode`, `define_schema`, `ComfyExtension`).
 Audio crosses the node boundary as ComfyUI's builtin `AUDIO` (`{"waveform": torch (B, C, T), "sample_rate"}`),
-converted by `_to_m5_audio` / `_from_m5_audio` in `nodes.py`.
+converted by `_to_m5_audio` / `_to_comfy_audio` in `nodes.py`.
 
 ### What's missing (big picture)
 
@@ -264,7 +264,7 @@ M13 = release work done along the way.
 
 ### M0 — Foundations
 
-- [ ] **M0.1 Project guide for Claude.** Add a `CLAUDE.md` at the ComfyUI root (and short ones in `mmmmm/` and `com5fy/`)
+- [x] **M0.1 Project guide for Claude.** Add a `CLAUDE.md` at the ComfyUI root (and short ones in `mmmmm/` and `com5fy/`)
   pointing to the spec and this plan, with setup/test commands and the conventions in §3.
   *Done when:* a fresh session can find the plan, set up the env and run the tests from CLAUDE.md alone.
 - [ ] **M0.2 Test setup for m5.** `mmmmm/tests/` with pytest config, markers (`slow`, `external`), tiny fixtures
@@ -506,3 +506,7 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
 - 2026-11-02 · — · Moved plan to `com5fy/docs/`; recorded the user's answers (§2); added the end-of-session test-workflow
   handoff (§0); added M0.6 (TS/React); macOS-only; MuseScore/Ableton/Premiere priority; listed remaining gaps (§8). · Next: M0.1.
 - 2026-11-02 · — · Test-workflow handoff now required per new feature, not per session. · Next: M0.1.
+- 2026-11-02 · M0.1 · Added `CLAUDE.md` in the ComfyUI root (local only, not a repo), `mmmmm/` and `com5fy/`; fixed the
+  boundary helper name in §1 (`_to_comfy_audio`). Checked setup/run commands (`--quick-test-for-ci` loads com5fy). ·
+  pytest isn't in the env yet (`uv run --with pytest` until M0.2 adds it); existing nodes use categories `audio`/`music`,
+  not `m5/…` (§3). Next: M0.2.
