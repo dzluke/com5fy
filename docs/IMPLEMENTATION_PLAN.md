@@ -97,7 +97,7 @@ converted by `_to_m5_audio` / `_to_comfy_audio` in `nodes.py`.
 
 ### What's missing (big picture)
 
-m5 has a pytest suite (`mmmmm/tests/`); com5fy has none yet. No MIDI, Descriptor, Control-data (Text/Number/BPF) types. No data-node history. No LLM integration.
+m5 and com5fy have pytest suites (`mmmmm/tests/`, `custom_nodes/com5fy/tests/`). No MIDI, Descriptor, Control-data (Text/Number/BPF) types. No data-node history. No LLM integration.
 No score→audio, no editing nodes, no import/export beyond loading a score file, no Code / Custom nodes,
 no timeline, no model nodes. Orchidea binary is macOS-only and needs a sound database (TinySOL) installed by hand.
 
@@ -271,7 +271,7 @@ M13 = release work done along the way.
   (a 1 s sine WAV, a 4-bar MusicXML, a saved Orchidea `connection.txt`). Tests for `Audio`, `Event`, `Sequence`,
   `Score.from_sequence` (quantization), `render_sequence`, and the `connection.txt` parser.
   *Done when:* `uv run pytest` in `mmmmm/` passes with no Orchidea/GPU.
-- [ ] **M0.3 Test setup for com5fy.** `custom_nodes/com5fy/tests/` that call each node's `execute` with fixtures,
+- [x] **M0.3 Test setup for com5fy.** `custom_nodes/com5fy/tests/` that call each node's `execute` with fixtures,
   including the AUDIO ⇄ m5.Audio boundary helpers. *Depends on:* M0.2.
 - [ ] **M0.4 Headless workflow runner.** `custom_nodes/com5fy/workflows/` + a script that starts/uses a ComfyUI server,
   posts a workflow (API format) to `/prompt`, and checks it finishes without errors. Save W1 as the first workflow.
@@ -516,3 +516,7 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
   `connection.txt` + tiny samples under `sounds/`, `make_fixtures.py`). 52 tests for Audio, Event, Sequence, Score
   (quantize, from_file, from_sequence), render_sequence, the connection parser/Sequence builder and config overrides;
   one slow test runs the real binary (passes locally with TinySOL). No code changes needed. · Next: M0.3.
+- 2026-11-02 · M0.3 · `custom_nodes/com5fy/tests/`: conftest puts the ComfyUI root on `sys.path` (package imports as
+  `custom_nodes.com5fy`), declares `slow`/`external` and skips them unless `-m` is given; fixtures (stereo sine AUDIO,
+  nested Sequence, copy of the 4-bar MusicXML). 27 tests: extension node ids, AUDIO ⇄ m5.Audio helpers, Sequence Viewer
+  payload, every node's `execute` (Orchidea with `m5.orchestrate` mocked). No code changes needed. · Next: M0.5, M0.4.

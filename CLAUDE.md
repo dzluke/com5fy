@@ -37,10 +37,11 @@ milestone first; tick the task and add a §9 session-log line when done. Project
 
 ```bash
 uv run python main.py --quick-test-for-ci            # from the ComfyUI root: loads all nodes, then exits
-uv run --with pytest pytest custom_nodes/com5fy/tests  # from the ComfyUI root, once M0.3 adds tests/
+uv run --with pytest pytest custom_nodes/com5fy/tests  # from the ComfyUI root
 ```
 
-Tests (M0.3) import node classes and call `execute` directly. Workflow JSONs in `workflows/` will run headlessly through
+Tests import the package as `custom_nodes.com5fy` (conftest puts the ComfyUI root on `sys.path`) and call each node's
+`execute` directly; slow/external tests are skipped unless `-m` is given. Workflow JSONs in `workflows/` will run headlessly through
 ComfyUI's `/prompt` API (M0.4). For UI changes, check the node in a running ComfyUI in the browser.
 
 ## New-feature handoff (required, plan §0)
