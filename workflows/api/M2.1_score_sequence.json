@@ -1,0 +1,66 @@
+{
+  "m5": {
+    "description": "M2.1: Load Score -> Score to Sequence -> Sequence Viewer, and -> Sequence to Score -> Score Viewer.",
+    "markers": [],
+    "expect_outputs": [
+      "2",
+      "4",
+      "6"
+    ]
+  },
+  "1": {
+    "class_type": "m5_LoadScore",
+    "inputs": {
+      "path": "custom_nodes/com5fy/tests/data/duo_tempo_dynamics.musicxml"
+    }
+  },
+  "2": {
+    "class_type": "m5_ScoreViewer",
+    "inputs": {
+      "score": [
+        "1",
+        0
+      ]
+    }
+  },
+  "3": {
+    "class_type": "m5_ScoreToSequence",
+    "inputs": {
+      "score": [
+        "1",
+        0
+      ],
+      "bpm": 0.0
+    }
+  },
+  "4": {
+    "class_type": "m5_SequenceViewer",
+    "inputs": {
+      "sequence": [
+        "3",
+        0
+      ],
+      "pixels_per_second": 120.0
+    }
+  },
+  "5": {
+    "class_type": "m5_SequenceToScore",
+    "inputs": {
+      "sequence": [
+        "3",
+        0
+      ],
+      "quantization": "sixteenth",
+      "bpm": 90.0
+    }
+  },
+  "6": {
+    "class_type": "m5_ScoreViewer",
+    "inputs": {
+      "score": [
+        "5",
+        0
+      ]
+    }
+  }
+}

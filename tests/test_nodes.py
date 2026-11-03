@@ -21,6 +21,8 @@ NODE_IDS = {
     "m5_ScoreViewer",
     "m5_SequenceViewer",
     "m5_SequenceToAudio",
+    "m5_ScoreToSequence",
+    "m5_SequenceToScore",
     "m5_LoadScore",
     "m5_AudioPlayback",
 }
@@ -139,6 +141,33 @@ def test_sequence_viewer(sequence):
     out = com5fy.SequenceViewer.execute(sequence=sequence, pixels_per_second=200.0)
     assert out.ui["sequence_data"] == [_sequence_to_payload(sequence)]
     assert out.ui["pixels_per_second"] == [200.0]
+
+
+def test_score_to_sequence_uses_score_tempo_unless_bpm_is_set(score_path):
+    score = m5.Score.from_file(score_path)
+    (seq,) = com5fy.ScoreToSequence.execute(score=score, bpm=0.0).args
+    events = seq.events[0][1].events
+    assert len(events) == 13
+    assert events[1][0] == 1000.0  # no tempo mark: 60 BPM
+    (fast,) = com5fy.ScoreToSequence.execute(score=score, bpm=120.0).args
+    assert fast.events[0][1].events[1][0] == 500.0
+
+
+def test_sequence_to_score_quantizes_at_bpm():
+    seq = m5.Sequence()
+    seq.add(1120, m5.Event(duration=260).add(pitch="C4"))
+    (score,) = com5fy.SequenceToScore.execute(sequence=seq, quantization="eighth", bpm=60.0).args
+    note = score.score.recurse().notes.first()
+    assert (note.offset, note.quarterLength) == (1.0, 0.5)
+    (raw,) = com5fy.SequenceToScore.execute(sequence=seq, quantization="none", bpm=60.0).args
+    assert raw.score.recurse().notes.first().offset == pytest.approx(1.12)
+
+
+def test_score_sequence_round_trip_through_the_nodes(score_path):
+    score = m5.Score.from_file(score_path)
+    (seq,) = com5fy.ScoreToSequence.execute(score=score, bpm=0.0).args
+    (again,) = com5fy.SequenceToScore.execute(sequence=seq, quantization="sixteenth", bpm=60.0).args
+    assert [n.pitches for n in again.score.recurse().notes] == [n.pitches for n in score.score.recurse().notes]
 
 
 def test_sequence_to_audio_mixes_event_audio():

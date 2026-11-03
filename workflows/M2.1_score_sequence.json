@@ -1,0 +1,338 @@
+{
+  "id": "5f6b1c1e-0a1b-4c4e-9d1a-31a4e0000021",
+  "revision": 0,
+  "last_node_id": 7,
+  "last_link_id": 5,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "m5_LoadScore",
+      "pos": [
+        60,
+        80
+      ],
+      "size": [
+        400,
+        80
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "path",
+          "name": "path",
+          "type": "STRING",
+          "widget": {
+            "name": "path"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "score",
+          "name": "score",
+          "type": "M5_SCORE",
+          "links": [
+            1,
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "m5_LoadScore"
+      },
+      "widgets_values": [
+        "custom_nodes/com5fy/tests/data/duo_tempo_dynamics.musicxml"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "m5_ScoreViewer",
+      "pos": [
+        500,
+        80
+      ],
+      "size": [
+        700,
+        420
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "score",
+          "name": "score",
+          "type": "M5_SCORE",
+          "link": 1
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "m5_ScoreViewer"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "title": "Original score"
+    },
+    {
+      "id": 3,
+      "type": "m5_ScoreToSequence",
+      "pos": [
+        60,
+        220
+      ],
+      "size": [
+        320,
+        80
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "score",
+          "name": "score",
+          "type": "M5_SCORE",
+          "link": 2
+        },
+        {
+          "localized_name": "bpm",
+          "name": "bpm",
+          "type": "FLOAT",
+          "widget": {
+            "name": "bpm"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "M5_SEQUENCE",
+          "links": [
+            3,
+            4
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "m5_ScoreToSequence"
+      },
+      "widgets_values": [
+        0
+      ]
+    },
+    {
+      "id": 4,
+      "type": "m5_SequenceViewer",
+      "pos": [
+        500,
+        540
+      ],
+      "size": [
+        700,
+        420
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "M5_SEQUENCE",
+          "link": 3
+        },
+        {
+          "localized_name": "pixels_per_second",
+          "name": "pixels_per_second",
+          "type": "FLOAT",
+          "widget": {
+            "name": "pixels_per_second"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "m5_SequenceViewer"
+      },
+      "widgets_values": [
+        120,
+        ""
+      ]
+    },
+    {
+      "id": 5,
+      "type": "m5_SequenceToScore",
+      "pos": [
+        60,
+        360
+      ],
+      "size": [
+        320,
+        110
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "sequence",
+          "name": "sequence",
+          "type": "M5_SEQUENCE",
+          "link": 4
+        },
+        {
+          "localized_name": "quantization",
+          "name": "quantization",
+          "type": "COMBO",
+          "widget": {
+            "name": "quantization"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "bpm",
+          "name": "bpm",
+          "type": "FLOAT",
+          "widget": {
+            "name": "bpm"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "score",
+          "name": "score",
+          "type": "M5_SCORE",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "m5_SequenceToScore"
+      },
+      "widgets_values": [
+        "sixteenth",
+        90
+      ]
+    },
+    {
+      "id": 6,
+      "type": "m5_ScoreViewer",
+      "pos": [
+        1240,
+        80
+      ],
+      "size": [
+        700,
+        420
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "score",
+          "name": "score",
+          "type": "M5_SCORE",
+          "link": 5
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "m5_ScoreViewer"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "title": "Back to a score"
+    },
+    {
+      "id": 7,
+      "type": "Note",
+      "pos": [
+        60,
+        540
+      ],
+      "size": [
+        400,
+        520
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "title": "M2.1 · Score ⇄ Sequence",
+      "properties": {},
+      "widgets_values": [
+        "M2.1: Score to Sequence and back.\n\nA two-part score (flute, cello) with a tempo change (90, then 120 BPM in bar 3), dynamics, staccato/tenuto/accent, \"pizz.\"/\"arco\", a tie across the barline and a quarter-flat B in the flute.\n\nPress Run. Look at:\n1. Original score (top middle).\n2. Sequence Viewer: the same notes at their times in ms, one staff per part. The run after the tempo change is visibly faster. Dynamics and pizz./arco show on the notes, and the quarter-flat B carries -50 cents.\n3. Back to a score: Sequence to Score quantizes the Sequence again at one tempo (90 BPM, sixteenth grid). The first bars come back as written (pitches, ties, staccato/tenuto/accent, dynamics, pizz./arco). The fast run at 120 BPM gets approximate, overlapping rhythms, because a Sequence has no tempo map yet (M2.2); the overlaps make music21 split the flute into two voices, hence the extra rests above the staff. Gaps between notes are not written as rests yet.\n\nTry: Score to Sequence bpm (0 = use the score's tempo marks), Sequence to Score quantization (\"none\" keeps exact times) and bpm. Swap the path for any MusicXML/MIDI file."
+      ],
+      "color": "#432",
+      "bgcolor": "#653"
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "M5_SCORE"
+    ],
+    [
+      2,
+      1,
+      0,
+      3,
+      0,
+      "M5_SCORE"
+    ],
+    [
+      3,
+      3,
+      0,
+      4,
+      0,
+      "M5_SEQUENCE"
+    ],
+    [
+      4,
+      3,
+      0,
+      5,
+      0,
+      "M5_SEQUENCE"
+    ],
+    [
+      5,
+      5,
+      0,
+      6,
+      0,
+      "M5_SCORE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.6,
+      "offset": [
+        0,
+        0
+      ]
+    }
+  },
+  "version": 0.4
+}

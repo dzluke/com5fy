@@ -18,8 +18,8 @@ milestone first; tick the task and add a §9 session-log line when done. Project
   New groups (e.g. `edit.py`) get their own module. In `nodes/__init__.py`, ComfyUI's `io` is imported *after* the
   submodules, because importing `.io` rebinds the name `io` in the package.
 - Node ids are `m5_<Name>` (e.g. `m5_ScoreViewer`); never rename an existing id (it breaks saved workflows).
-  Plan §3 wants categories under `m5/…` (`m5/convert`, `m5/edit`, `m5/io`…); the existing nodes still use
-  `audio` / `music`.
+  Plan §3 wants categories under `m5/…` (`m5/convert`, `m5/edit`, `m5/io`…); the older nodes still use
+  `audio` / `music`; new nodes use `m5/…` (Score/Sequence conversions are in `m5/convert`).
 - Custom types: `@io.comfytype(io_type="M5_…")` on an `io.ComfyTypeIO` subclass (`M5_SCORE`, `M5_SEQUENCE` so far),
   carrying the m5 object as-is.
 - Audio crosses node boundaries as ComfyUI's builtin `AUDIO` (`{"waveform": torch (B, C, T), "sample_rate"}`) so it

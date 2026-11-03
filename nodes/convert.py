@@ -320,3 +320,93 @@ class SequenceToAudio(io.ComfyNode):
         rendered = m5.render_sequence(sequence, normalize=normalize)
         return io.NodeOutput(_to_comfy_audio(rendered))
 
+
+# The Sequence to Score quantization dropdown: m5's grids from coarse to fine,
+# plus "none" for raw (unquantized) timings.
+QUANTIZATION_OPTIONS = list(m5.QUANTIZE_GRID) + ["none"]
+
+
+class ScoreToSequence(io.ComfyNode):
+    """Convert an m5.Score into an m5.Sequence (``Score.to_sequence``): one
+    sub-Sequence per part, one event per note or chord at its time in ms."""
+
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="m5_ScoreToSequence",
+            display_name="Score to Sequence",
+            category="m5/convert",
+            description=(
+                "Turns a score into a Sequence: notes and chords at their times "
+                "in milliseconds, one sub-Sequence per part. Keeps pitch (with "
+                "microtones), instrument, dynamics, text playing styles, "
+                "articulations and velocities. Ties are merged into one note; "
+                "rests become gaps."
+            ),
+            inputs=[
+                m5Score.Input("score"),
+                io.Float.Input(
+                    "bpm",
+                    default=0.0,
+                    min=0.0,
+                    max=1000.0,
+                    step=1.0,
+                    tooltip=(
+                        "Tempo used to turn beats into milliseconds. 0 uses the "
+                        "score's own tempo marks, tempo changes included (60 BPM "
+                        "if it has none)."
+                    ),
+                ),
+            ],
+            outputs=[m5Sequence.Output("sequence")],
+        )
+
+    @classmethod
+    def execute(cls, score, bpm: float = 0.0) -> io.NodeOutput:
+        return io.NodeOutput(score.to_sequence(bpm=bpm or None))
+
+
+class SequenceToScore(io.ComfyNode):
+    """Quantize an m5.Sequence into an m5.Score (``Score.from_sequence``)."""
+
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="m5_SequenceToScore",
+            display_name="Sequence to Score",
+            category="m5/convert",
+            description=(
+                "Turns a Sequence into a metered score: each sub-Sequence becomes "
+                "a part, and onsets and durations are snapped to a rhythmic grid."
+            ),
+            inputs=[
+                m5Sequence.Input("sequence"),
+                io.Combo.Input(
+                    "quantization",
+                    options=QUANTIZATION_OPTIONS,
+                    default="thirty-second",
+                    tooltip=(
+                        "Grid that onsets and durations snap to. Notes shorter "
+                        "than one cell keep one cell. 'none' keeps the exact "
+                        "timings (hard to read as notation)."
+                    ),
+                ),
+                io.Float.Input(
+                    "bpm",
+                    default=m5.DEFAULT_BPM,
+                    min=1.0,
+                    max=1000.0,
+                    step=1.0,
+                    tooltip=(
+                        "Tempo used to turn milliseconds into beats; written into "
+                        "the score as a metronome mark."
+                    ),
+                ),
+            ],
+            outputs=[m5Score.Output("score")],
+        )
+
+    @classmethod
+    def execute(cls, sequence, quantization: str, bpm: float) -> io.NodeOutput:
+        grid = None if quantization == "none" else quantization
+        return io.NodeOutput(m5.Score.from_sequence(sequence, quantization=grid, bpm=bpm))

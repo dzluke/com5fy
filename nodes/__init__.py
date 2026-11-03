@@ -9,7 +9,7 @@
 
 from typing_extensions import override
 
-from .convert import OrchideaNode, SequenceToAudio
+from .convert import OrchideaNode, ScoreToSequence, SequenceToAudio, SequenceToScore
 from .data import AudioPlayback, ScoreViewer, SequenceViewer
 from .io import LoadScore
 from .types import m5Score, m5Sequence
@@ -31,6 +31,8 @@ class m5Extension(ComfyExtension):
             ScoreViewer,
             SequenceViewer,
             SequenceToAudio,
+            ScoreToSequence,
+            SequenceToScore,
             LoadScore,
             AudioPlayback,
         ]
@@ -48,6 +50,8 @@ __all__ = [
     "ScoreViewer",
     "SequenceViewer",
     "SequenceToAudio",
+    "ScoreToSequence",
+    "SequenceToScore",
     "LoadScore",
     "AudioPlayback",
     "m5Extension",

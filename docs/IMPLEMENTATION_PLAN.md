@@ -66,7 +66,7 @@ ComfyUI/                         upstream ComfyUI checkout (not a git repo here)
 │   └── src/m5/
 │       ├── audio.py             Audio(waveform: np.ndarray (C, T) float32, sample_rate)
 │       ├── time.py              Event (duration ms + list-valued fields), Sequence ((start_ms, item) list, nestable)
-│       ├── score.py             Score (wraps music21.stream.Score), from_file, from_sequence (quantize), to_musicxml
+│       ├── score.py             Score (wraps music21.stream.Score), from_file, from_sequence (quantize), to_sequence, to_musicxml
 │       ├── render.py            render_sequence(Sequence) -> Audio (mixes audio carried by events)
 │       ├── orchidea.py          orchestrate(Audio, params, database) -> Orchestration; SoundDatabase; connection.txt parser
 │       ├── orch_config.txt      default Orchidea config
@@ -93,6 +93,8 @@ Frontend: edit `ui/src/`, then `cd ui && npm ci && npm run build` (reproducible)
 | `m5_ScoreViewer`      | displays a Score as engraved notation (OSMD, single horizontal staff line) |
 | `m5_SequenceViewer`   | displays a Sequence as proportional, time-based notation |
 | `m5_SequenceToAudio`  | Sequence → AUDIO (mixes the samples carried by events) |
+| `m5_ScoreToSequence`  | Score → Sequence (`Score.to_sequence`: score tempo or a fixed bpm) |
+| `m5_SequenceToScore`  | Sequence → Score (`Score.from_sequence`: quantization grid + bpm) |
 | `m5_AudioPlayback`    | waveform display + playback |
 
 Nodes use the new `comfy_api.latest.io` schema API (`io.ComfyNode`, `define_schema`, `ComfyExtension`).
@@ -162,6 +164,17 @@ Audio → {Score, MIDI, Descriptor, Sequence}   via engines (Orchidea, pitch tra
 
 So `score → MIDI` = `Score.to_sequence()` then `Midi.from_sequence()`. Each class gets
 `from_sequence` / `to_sequence`. Direct paths are only added where the round trip loses information.
+
+**Score ⇄ Sequence details (M2.1).** `Score.to_sequence` gives one sub-Sequence per part (added at 0 ms), one Event
+per note/chord/unpitched note; rests are gaps, tie chains are one Event (articulations from any tied note kept).
+Dynamics and text expressions are *state*: every Event carries the ones in force, and `from_sequence` writes a marking
+only when it changes, so the round trip is exact. `playing_style` holds the text expression first, then the note's
+articulations as MusicXML-style names (`"staccato"`, `"strong-accent"`); `from_sequence` turns names of music21
+articulations back into articulations and treats the first other value as the text expression.
+**m5 pitch names** are `<letter><accidental><octave>` with `#`/`x` sharps and `b` flats; `-` is only the octave sign
+(`"C-1"`), unlike music21's `"B-4"`. Microtones (music21 microtones and quarter-tone accidentals) become the
+`detuning_cents` custom field, one value per pitch, with the name keeping the whole-semitone part, as Orchidea does.
+`from_sequence` parses names with the same rules (it used to pass them to music21, which read `"C-1"` as C♭1).
 
 ### 2.4 Engines
 
@@ -310,8 +323,10 @@ M13 = release work done along the way.
 
 ### M2 — Complete the data model
 
-- [ ] **M2.1 `Score ⇄ Sequence`.** Add `Score.to_sequence(time_map)` (the inverse of `from_sequence`), keeping
+- [x] **M2.1 `Score ⇄ Sequence`.** Add `Score.to_sequence(time_map)` (the inverse of `from_sequence`), keeping
   instrument, pitch (incl. microtones), dynamics, playing styles. Round-trip tests.
+  Done as `Score.to_sequence(bpm=None)` (score's metronome marks, or one tempo); M2.2 swaps the private
+  `_tempo_map` for a `TimeMap`. Nodes `m5_ScoreToSequence` / `m5_SequenceToScore` (`m5/convert`).
 - [ ] **M2.2 `TimeMap`.** Tempo changes + meter changes; `ms_to_measure_beat`, `measure_beat_to_ms`, `ms_to_quarters`.
   Score uses it instead of the fixed `DEFAULT_BPM`. Extract from music21 scores and MIDI files.
 - [ ] **M2.3 Proportional vs metered scores.** `Score` gets a `notation` mode (`metered` | `proportional`);
@@ -346,7 +361,8 @@ Spec: data nodes display only (no editing); each keeps a history of versions you
 ### M4 — Symbolic conversions and analysis (W3 groundwork)
 
 - [ ] **M4.1 Convert nodes via the hub.** Score ⇄ MIDI, Score/MIDI → Sequence and back, using §2.3. One generic
-  `m5_Convert` node per output type is fine. *Depends on:* M2.1, M2.4.
+  `m5_Convert` node per output type is fine (Score ⇄ Sequence already has its own two nodes from M2.1; keep their ids
+  if a generic node replaces them in the menu). *Depends on:* M2.1, M2.4.
 - [ ] **M4.2 Engine registry.** `m5.engines` with the protocol + registry from §2.4; Orchidea moved behind it as the first
   `AudioToScore` engine; node engine dropdowns read from the registry.
 - [ ] **M4.3 Audio → Descriptor.** Engine using librosa (pitch/f0, loudness, spectral centroid ≈ brightness, flux, onsets)
@@ -561,3 +577,12 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
   viewers/players). `workflows/M1.4_w1_audio_to_score.json` checked in the browser; all tests pass with the committed
   (unedited) `orch_config.txt`. · Open: no musically meaningful shipped test audio yet (§8.4); ranges/defaults want
   composer feedback. Next: M2.
+- 2026-11-03 · M2.1 · m5: `Score.to_sequence(bpm=None)` (parts → sub-Sequences, tempo marks incl. changes and
+  referents, ties merged, dynamics/text styles as state, articulations, velocity, editorial → custom fields,
+  microtones → per-pitch `detuning_cents`); `from_sequence` now parses m5 pitch names (`b` flats, `x`, `C-1`), applies
+  per-pitch detuning, and turns articulation names into articulations (decisions in §2.3). com5fy: `m5_ScoreToSequence`,
+  `m5_SequenceToScore` (category `m5/convert`), fixture `tests/data/duo_tempo_dynamics.musicxml`, workflow
+  `M2.1_score_sequence` (UI + API, checked in the browser). · Open: `from_sequence` doesn't write rests in gaps, and
+  overlapping notes in a part make music21 put the whole part into two voices (extra measure rests); a Sequence carries
+  no tempo, so re-quantizing a score with tempo changes at one bpm is approximate (M2.2); OSMD titles untitled scores
+  "Untitled Score". Next: M2.2.
