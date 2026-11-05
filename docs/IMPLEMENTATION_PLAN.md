@@ -91,10 +91,10 @@ Frontend: edit `ui/src/`, then `cd ui && npm ci && npm run build` (reproducible)
 | `m5_Orchidea`         | AUDIO → Score + Sequence + orchestrated AUDIO (audio → score via Orchidea); database dropdown from `models/m5/orchidea_db` |
 | `m5_LoadScore`        | file (MusicXML/MIDI/ABC…) → Score |
 | `m5_ScoreViewer`      | displays a Score as engraved notation (OSMD, single horizontal staff line) |
-| `m5_SequenceViewer`   | displays a Sequence as proportional, time-based notation |
+| `m5_SequenceViewer`   | displays a Sequence as proportional, time-based notation, with dynamics, text styles, articulations, microtones; live `zoom` |
 | `m5_SequenceToAudio`  | Sequence → AUDIO (mixes the samples carried by events) |
-| `m5_ScoreToSequence`  | Score → Sequence (`Score.to_sequence`: score tempo or a fixed bpm) |
-| `m5_SequenceToScore`  | Sequence → Score (`Score.from_sequence`: quantization grid + bpm) |
+| `m5_ScoreToSequence`  | Score → Sequence (`Score.to_sequence`: the score's tempo marks, 120 BPM without) |
+| `m5_SequenceToScore`  | Sequence → Score (`Score.from_sequence`: quantization grid + bpm, 0 = estimated) |
 | `m5_AudioPlayback`    | waveform display + playback |
 
 Nodes use the new `comfy_api.latest.io` schema API (`io.ComfyNode`, `define_schema`, `ComfyExtension`).
@@ -167,13 +167,26 @@ So `score → MIDI` = `Score.to_sequence()` then `Midi.from_sequence()`. Each cl
 
 **Score ⇄ Sequence details (M2.1).** `Score.to_sequence` gives one sub-Sequence per part (added at 0 ms), one Event
 per note/chord/unpitched note; rests are gaps, tie chains are one Event (articulations from any tied note kept).
-Dynamics and text expressions are *state*: every Event carries the ones in force, and `from_sequence` writes a marking
-only when it changes, so the round trip is exact. `playing_style` holds the text expression first, then the note's
-articulations as MusicXML-style names (`"staccato"`, `"strong-accent"`); `from_sequence` turns names of music21
-articulations back into articulations and treats the first other value as the text expression.
+Dynamics and text expressions sit **only on the Event where the marking appears** (the first note at or after it), as
+in the score (user decision 2026-11-05). `from_sequence` writes a marking when it differs from the last one written, so
+Sequences that repeat them on every event (Orchidea's) still give one marking per change; a repeated identical marking
+is dropped. `playing_style` holds the text expression first, then the note's articulations as MusicXML-style names
+(`"staccato"`, `"strong-accent"`, list in `m5.ARTICULATIONS`); `from_sequence` turns those back into articulations
+and treats the first other value as the text expression. The Sequence Viewer shows them the same way (dynamic and
+text style only where they change on a staff).
+**Tempo** (2026-11-05): a score with no metronome mark is read at `DEFAULT_BPM` = **120** (music21, MIDI, notation
+software). `Score to Sequence` always uses the score's marks (no bpm widget; `to_sequence(bpm=)` remains in m5).
+`from_sequence(bpm=None)` estimates the tempo with `m5.estimate_bpm` (`tempo.py`): a grid search over 40–200 BPM
+for the beat that puts onsets on the simplest subdivisions, leaves few beats empty and is near 100 BPM; the half/double
+tempo ambiguity is settled by that prior. The Orchidea node keeps a fixed 60 BPM. The metronome mark is written into the
+first part (on the Score itself MusicXML export dropped it).
 **m5 pitch names** are `<letter><accidental><octave>` with `#`/`x` sharps and `b` flats; `-` is only the octave sign
 (`"C-1"`), unlike music21's `"B-4"`. Microtones (music21 microtones and quarter-tone accidentals) become the
-`detuning_cents` custom field, one value per pitch, with the name keeping the whole-semitone part, as Orchidea does.
+`detuning_cents` custom field, one value per pitch, with the name the **nearest tempered pitch** on the written step and
+the cents within ±50 (C +70 → C# −30; B quarter-flat → B −50): the usual data convention (Orchidea, MIDI pitch bend,
+cents annotations in spectral scores). `from_sequence` writes ±50 as quarter-tone accidentals (MusicXML
+`quarter-flat` etc., what notation software shows) and other values as microtones (fractional `alter`); the Sequence
+Viewer draws ±50 as quarter-tone accidentals and other deviations as a cents label.
 `from_sequence` parses names with the same rules (it used to pass them to music21, which read `"C-1"` as C♭1).
 
 ### 2.4 Engines
@@ -586,3 +599,12 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
   overlapping notes in a part make music21 put the whole part into two voices (extra measure rests); a Sequence carries
   no tempo, so re-quantizing a score with tempo changes at one bpm is approximate (M2.2); OSMD titles untitled scores
   "Untitled Score". Next: M2.2.
+- 2026-11-05 · M2.1 feedback · m5: `DEFAULT_BPM` 60 → 120; `estimate_bpm` (new `tempo.py`), used by
+  `from_sequence(bpm=None)`; dynamics/text styles only on the event where the marking appears; microtones named as the
+  nearest pitch ± ≤50 cents; ±50 written as quarter-tone accidentals; tempo mark now exported (it was lost); fixture
+  `duo_tempo_dynamics.musicxml` copied to m5's tests; `m5.ARTICULATIONS`. com5fy: Score to Sequence loses `bpm`;
+  Sequence to Score `bpm` 0 = estimate (default); Sequence Viewer `pixels_per_second` → `zoom` (redraws live), shows
+  dynamics, text styles, articulation symbols, quarter-tone accidentals and cents labels; Score Viewer retries with
+  pinned rest positions to dodge an OSMD 1.9.0 crash (2nd-voice rest next to a quarter tone); Orchidea node pins 60 BPM.
+  Workflows M2.1 and M1.4 updated; checked in the browser. · Open: the half/double-tempo choice is a heuristic; a
+  Sequence still carries no tempo map (M2.2). Next: M2.2.

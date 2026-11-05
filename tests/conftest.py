@@ -52,6 +52,13 @@ def score_path() -> Path:
 
 
 @pytest.fixture
+def duo_path() -> Path:
+    """Flute and cello, ♩=90 then ♩=120, with dynamics, articulations, pizz./arco,
+    a tie and a quarter-flat (the M2.1 workflow's input)."""
+    return DATA / "duo_tempo_dynamics.musicxml"
+
+
+@pytest.fixture
 def comfy_audio() -> dict:
     """A ComfyUI AUDIO dict: 0.5 s stereo 440 Hz sine at 8 kHz, shape (1, 2, 4000)."""
     rate = 8000

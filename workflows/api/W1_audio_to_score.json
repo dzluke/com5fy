@@ -25,7 +25,7 @@
     }
   },
   "3": {"class_type": "m5_ScoreViewer", "inputs": {"score": ["2", 0]}},
-  "4": {"class_type": "m5_SequenceViewer", "inputs": {"sequence": ["2", 2], "pixels_per_second": 120.0}},
+  "4": {"class_type": "m5_SequenceViewer", "inputs": {"sequence": ["2", 2], "zoom": 1.0}},
   "5": {"class_type": "m5_AudioPlayback", "inputs": {"audio": ["2", 1]}},
   "6": {"class_type": "m5_SequenceToAudio", "inputs": {"sequence": ["2", 2], "normalize": true}},
   "7": {"class_type": "m5_AudioPlayback", "inputs": {"audio": ["6", 0]}}

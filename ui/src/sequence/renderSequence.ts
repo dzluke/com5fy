@@ -4,9 +4,17 @@
 //
 //   { staves: [ { instrument: str|null,
 //                 notes: [ { start_ms, duration_ms, pitches: ["C4", ...],
-//                            dynamic?, playing_style?, detuning_cents? }, ... ] },
+//                            dynamic?, playing_style?, articulations?: [str],
+//                            detuning_cents?: [one per pitch] }, ... ] },
 //               ... ],
 //     duration_ms: number }
+//
+// The backend sends dynamic / playing_style only where they change on a staff,
+// so they are drawn as a score shows them: the dynamic below the staff and the
+// text playing style ("pizz.") above it, at the note's onset. Articulations are
+// drawn as their usual symbols on the notehead side (text when VexFlow has no
+// symbol). A ±50 cent detuning is drawn as a quarter-tone accidental; any other
+// detuning keeps the semitone accidental and gets a small cents label (+14).
 //
 // No bar lines, meters or beats. Every event is an identical filled
 // quarter-note head placed horizontally at its absolute onset *time*; one
@@ -24,7 +32,8 @@ export interface SequenceNote {
   pitches?: string[];
   dynamic?: string;
   playing_style?: string;
-  detuning_cents?: number;
+  articulations?: string[];
+  detuning_cents?: number[];
 }
 
 export interface SequenceStaff {
@@ -56,6 +65,28 @@ const STAFF_HEIGHT = 4 * STAFF_LINE_GAP; // top line -> bottom line of a 5-line 
 const STAFF_GAP = 28; // minimum vertical gap between adjacent staves
 const NOTEHEAD_PAD = 9; // notehead radius + breathing room past ledger lines
 const MIN_TOTAL_WIDTH = 360;
+const TEXT_ROW = 15; // height of one row of dynamics / playing-style text
+const TEXT_FONT = 11;
+
+/** Pixels per second at zoom 1 (the Python node's BASE_PIXELS_PER_SECOND). */
+export const BASE_PIXELS_PER_SECOND = 120;
+
+// MusicXML articulation names (what m5 puts in playing_style) -> VexFlow codes.
+const ARTICULATION_CODES: Record<string, string> = {
+  staccato: "a.",
+  staccatissimo: "av",
+  spiccato: "av",
+  accent: "a>",
+  tenuto: "a-",
+  "strong-accent": "a^",
+  "snap-pizzicato": "ao",
+  stopped: "a+",
+  harmonic: "ah",
+  "up-bow": "a|",
+  "down-bow": "am",
+};
+// Articulations that sit above the staff whichever way the stem goes.
+const ALWAYS_ABOVE = new Set(["up-bow", "down-bow", "snap-pizzicato", "stopped", "harmonic"]);
 
 type Letter = "c" | "d" | "e" | "f" | "g" | "a" | "b";
 type Clef = "treble" | "bass";
@@ -74,6 +105,8 @@ const CLEF_LINES: Record<Clef, { top: number; bottom: number }> = {
 interface ParsedPitch {
   key: string;
   accidental: string | null;
+  /** Semitones of the written accidental (sharps positive). */
+  alter: number;
   midi: number;
   letter: Letter;
   octave: number;
@@ -103,7 +136,48 @@ export function parsePitch(name: string): ParsedPitch | null {
   else if (flats === 1) accidental = "b";
   else if (flats >= 2) accidental = "bb";
 
-  return { key: `${letter}/${octave}`, accidental, midi, letter, octave };
+  return { key: `${letter}/${octave}`, accidental, alter: sharps - flats, midi, letter, octave };
+}
+
+/**
+ * How to draw a pitch detuned by `cents`: a quarter-tone accidental when the
+ * pitch is a quarter tone off (B −50 → B quarter-flat, C# +50 → C three-quarter
+ * sharp, on the same staff position), else the semitone accidental plus a
+ * cents label, the way spectral scores mark other deviations.
+ */
+export function microtonalSpelling(
+  p: ParsedPitch,
+  cents: number,
+): { accidental: string | null; label: string | null } {
+  const rounded = Math.round(cents);
+  if (rounded === 0) return { accidental: p.accidental, label: null };
+  if (Math.abs(rounded) === 50) {
+    const quarterTones: Record<string, string> = { "-1.5": "db", "-0.5": "d", "0.5": "+", "1.5": "++" };
+    const code = quarterTones[String(p.alter + rounded / 100)];
+    if (code) return { accidental: code, label: null };
+  }
+  return { accidental: p.accidental, label: rounded > 0 ? `+${rounded}` : `\u2212${-rounded}` };
+}
+
+// Rough width of a text label, for placing labels before anything is drawn.
+function estimateWidth(text: string, fontSize: number): number {
+  return text.length * fontSize * 0.55;
+}
+
+/**
+ * Assign each label a row so labels in one row don't overlap: the first row
+ * whose last label ends before this one starts. Returns the row per label and
+ * the number of rows used.
+ */
+function stackLabels(items: { x: number; width: number }[]): { rows: number[]; count: number } {
+  const ends: number[] = [];
+  const rows = items.map(({ x, width }) => {
+    let row = ends.findIndex((end) => x >= end + 4);
+    if (row < 0) row = ends.length;
+    ends[row] = x + width;
+    return row;
+  });
+  return { rows, count: ends.length };
 }
 
 // A "nice" time-axis step (in seconds) so gridlines land ~targetPx apart.
@@ -142,7 +216,7 @@ export async function renderSequence(
   node: M5Node,
   el: HTMLDivElement,
   data: SequenceData,
-  pixelsPerSecond: number,
+  zoom: number,
 ): Promise<void> {
   let VF: typeof import("vexflow");
   try {
@@ -153,7 +227,10 @@ export async function renderSequence(
     return;
   }
   try {
-    draw(VF, node, el, data, pixelsPerSecond);
+    // Keep the view on the same moment in time when the zoom changes.
+    const ratio = el.scrollWidth > el.clientWidth ? (el.scrollLeft + el.clientWidth / 2) / el.scrollWidth : 0;
+    draw(VF, node, el, data, BASE_PIXELS_PER_SECOND * (zoom > 0 ? zoom : 1));
+    if (ratio) el.scrollLeft = Math.max(0, ratio * el.scrollWidth - el.clientWidth / 2);
   } catch (err) {
     console.error("[m5.SequenceViewer] failed to render sequence:", err);
     el.textContent = "Failed to render sequence: " + ((err as Error)?.message ?? err);
@@ -217,7 +294,36 @@ function draw(
       above = Math.max(above, (maxDia - lines.top) * HALF_LINE + NOTEHEAD_PAD);
       below = Math.max(below, (lines.bottom - minDia) * HALF_LINE + NOTEHEAD_PAD);
     }
-    return { staff, notes, clef, above, below, top: 0 };
+    // Articulations sit under the noteheads (stems go up): leave room for them.
+    if (notes.some((n) => n.articulations?.length)) below += 12;
+
+    // Text rows: playing styles (and articulations without a symbol) above
+    // the staff, dynamics below it.
+    const styleItems = notes.flatMap((n) => {
+      const texts = [
+        n.playing_style,
+        ...(n.articulations || []).filter((a) => !(a in ARTICULATION_CODES)),
+      ].filter((t): t is string => !!t);
+      if (!texts.length) return [];
+      const text = texts.join(", ");
+      return [{ note: n, text, x: timeX(n.start_ms) - 4, width: estimateWidth(text, TEXT_FONT) }];
+    });
+    const dynamicItems = notes.flatMap((n) =>
+      n.dynamic
+        ? [{ note: n, text: n.dynamic, x: timeX(n.start_ms) - 4, width: estimateWidth(n.dynamic, TEXT_FONT + 2) }]
+        : [],
+    );
+    const styleRows = stackLabels(styleItems);
+    const dynamicRows = stackLabels(dynamicItems);
+    above += styleRows.count * TEXT_ROW;
+    below += dynamicRows.count * TEXT_ROW;
+    return {
+      staff, notes, clef, above, below, top: 0,
+      styleItems, styleRows: styleRows.rows,
+      dynamicItems, dynamicRows: dynamicRows.rows,
+      noteAbove: above - styleRows.count * TEXT_ROW,
+      noteBelow: below - dynamicRows.count * TEXT_ROW,
+    };
   });
 
   // Stack the staves, giving each its measured headroom/legroom plus a gap.
@@ -291,9 +397,11 @@ function draw(
 
     // --- Each event: a quarter-note head placed at its onset time ---------
     for (const note of notes) {
+      // Pair each pitch with its detuning before sorting by height.
       const parsedList = (note.pitches || [])
-        .map(parsePitch)
-        .filter((p): p is ParsedPitch => p !== null)
+        .map((name, i) => ({ p: parsePitch(name), cents: note.detuning_cents?.[i] ?? 0 }))
+        .filter((x): x is { p: ParsedPitch; cents: number } => x.p !== null)
+        .map(({ p, cents }) => ({ ...p, ...microtonalSpelling(p, cents) }))
         .sort((a, b) => a.midi - b.midi);
 
       const isUnpitched = parsedList.length === 0;
@@ -309,6 +417,15 @@ function draw(
           parsedList.forEach((p, idx) => {
             if (p.accidental) staveNote.addModifier(new VF.Accidental(p.accidental), idx);
           });
+        }
+        for (const name of note.articulations || []) {
+          const code = ARTICULATION_CODES[name];
+          if (!code) continue;
+          const articulation = new VF.Articulation(code);
+          articulation.setPosition(
+            ALWAYS_ABOVE.has(name) ? VF.Modifier.Position.ABOVE : VF.Modifier.Position.BELOW,
+          );
+          staveNote.addModifier(articulation, 0);
         }
       } catch (e) {
         console.warn("[m5.SequenceViewer] skipping unrenderable note", note, e);
@@ -347,7 +464,27 @@ function draw(
         ctx.lineTo(endX, lineY);
         ctx.stroke();
       }
+
+      // Cents labels for detunings that aren't quarter tones, by each notehead.
+      ctx.setFont("Arial", 8, "");
+      ctx.setFillStyle("#555");
+      parsedList.forEach((p, idx) => {
+        if (p.label && ys[idx] !== undefined) ctx.fillText(p.label, startX + 8, ys[idx] - 5);
+      });
     }
+
+    // Playing styles above the staff, dynamics below, at each note's onset.
+    const styleTop = staffTop - L.noteAbove;
+    ctx.setFillStyle("#000");
+    ctx.setFont("Times New Roman", TEXT_FONT, "normal", "italic");
+    L.styleItems.forEach((item, i) => {
+      ctx.fillText(item.text, item.x, styleTop - L.styleRows[i] * TEXT_ROW - 4);
+    });
+    const dynamicTop = staffTop + STAFF_HEIGHT + L.noteBelow;
+    ctx.setFont("Times New Roman", TEXT_FONT + 2, "bold", "italic");
+    L.dynamicItems.forEach((item, i) => {
+      ctx.fillText(item.text, item.x, dynamicTop + (L.dynamicRows[i] + 1) * TEXT_ROW - 3);
+    });
   });
 
   requestAnimationFrame(() => fitNodeHeight(node, el));

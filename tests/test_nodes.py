@@ -97,8 +97,26 @@ def test_sequence_payload_has_one_staff_per_subsequence(sequence):
     assert flute["notes"][1] == {"start_ms": 500.0, "duration_ms": 500, "pitches": ["C#4"]}
     # Onsets of nested sequences are absolute.
     assert oboe["notes"][0]["start_ms"] == 250.0
-    assert oboe["notes"][0]["detuning_cents"] == 50
+    assert oboe["notes"][0]["detuning_cents"] == [50]
     assert loose["notes"] == [{"start_ms": 100.0, "duration_ms": 200, "pitches": []}]
+
+
+def test_sequence_payload_shows_markings_like_a_score():
+    staff = m5.Sequence()
+    # Orchidea-style: the dynamic and style repeated on every event.
+    staff.add(0, m5.Event(duration=100).add(pitch="C4", dynamic="p", playing_style="pizz"))
+    staff.add(100, m5.Event(duration=100).add(pitch="D4", dynamic="p", playing_style="pizz")
+              .add(playing_style="staccato"))
+    staff.add(200, m5.Event(duration=100).add(pitch="E4", dynamic="f", playing_style="arco")
+              .add(pitch="G4", detuning_cents=0).add(detuning_cents=-50))
+    root = m5.Sequence()
+    root.add(0, staff)
+    first, second, third = _sequence_to_payload(root)["staves"][0]["notes"]
+    assert (first["dynamic"], first["playing_style"]) == ("p", "pizz")
+    assert "dynamic" not in second and "playing_style" not in second
+    assert second["articulations"] == ["staccato"]
+    assert (third["dynamic"], third["playing_style"]) == ("f", "arco")
+    assert third["detuning_cents"] == [0, -50]
 
 
 def test_sequence_payload_of_empty_sequence():
@@ -138,19 +156,24 @@ def test_score_viewer_leaves_out_placeholder_metadata(sequence):
 
 
 def test_sequence_viewer(sequence):
-    out = com5fy.SequenceViewer.execute(sequence=sequence, pixels_per_second=200.0)
+    out = com5fy.SequenceViewer.execute(sequence=sequence, zoom=2.0)
     assert out.ui["sequence_data"] == [_sequence_to_payload(sequence)]
-    assert out.ui["pixels_per_second"] == [200.0]
+    assert out.ui["zoom"] == [2.0]
 
 
-def test_score_to_sequence_uses_score_tempo_unless_bpm_is_set(score_path):
-    score = m5.Score.from_file(score_path)
-    (seq,) = com5fy.ScoreToSequence.execute(score=score, bpm=0.0).args
+def test_score_to_sequence_uses_the_score_tempo(score_path, duo_path):
+    (seq,) = com5fy.ScoreToSequence.execute(score=m5.Score.from_file(score_path)).args
     events = seq.events[0][1].events
     assert len(events) == 13
-    assert events[1][0] == 1000.0  # no tempo mark: 60 BPM
-    (fast,) = com5fy.ScoreToSequence.execute(score=score, bpm=120.0).args
-    assert fast.events[0][1].events[1][0] == 500.0
+    assert events[1][0] == 500.0  # no tempo mark: 120 BPM
+    (duo,) = com5fy.ScoreToSequence.execute(score=m5.Score.from_file(duo_path)).args
+    assert duo.events[0][1].events[1][0] == pytest.approx(60_000 / 90)  # ♩=90
+
+
+def test_sequence_to_score_estimates_bpm_when_zero(duo_path):
+    (seq,) = com5fy.ScoreToSequence.execute(score=m5.Score.from_file(duo_path)).args
+    (score,) = com5fy.SequenceToScore.execute(sequence=seq, quantization="sixteenth", bpm=0.0).args
+    assert score.score.recurse().getElementsByClass("MetronomeMark").first().number == 90
 
 
 def test_sequence_to_score_quantizes_at_bpm():
@@ -165,7 +188,7 @@ def test_sequence_to_score_quantizes_at_bpm():
 
 def test_score_sequence_round_trip_through_the_nodes(score_path):
     score = m5.Score.from_file(score_path)
-    (seq,) = com5fy.ScoreToSequence.execute(score=score, bpm=0.0).args
+    (seq,) = com5fy.ScoreToSequence.execute(score=score).args
     (again,) = com5fy.SequenceToScore.execute(sequence=seq, quantization="sixteenth", bpm=60.0).args
     assert [n.pitches for n in again.score.recurse().notes] == [n.pitches for n in score.score.recurse().notes]
 

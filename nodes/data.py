@@ -78,13 +78,20 @@ def _flatten_sequence(sequence, base_ms: float = 0.0) -> list[tuple[float, Any]]
     return out
 
 
-def _note_payload(start_ms: float, event) -> dict:
+def _note_payload(start_ms: float, event, shown: dict) -> dict:
     """Serialize one m5.Event into a plain dict for the Sequence Viewer frontend.
 
     ``pitches`` is always a list of symbolic pitch-name strings: the Event's own
     ``pitch`` values when present, otherwise derived from its ``midi_note`` values
     (so the frontend always gets names and never has to know MIDI). An empty list
     means an unpitched event. Onset and duration stay in milliseconds.
+
+    Markings are written the way a score shows them: ``dynamic`` and
+    ``playing_style`` (a text expression such as "pizz.") only where they
+    change on the staff (``shown`` tracks the last ones written), since some
+    Sequences, like Orchidea's, repeat them on every event; ``articulations``
+    (``"staccato"``…) on every note that has them. ``detuning_cents`` has one
+    value per pitch, only when some pitch is detuned.
     """
     if event.pitch:
         pitches = list(event.pitch)
@@ -101,13 +108,19 @@ def _note_payload(start_ms: float, event) -> dict:
     # Optional per-note annotations, included only when present so the payload
     # stays small and the frontend can treat them as truly optional.
     dynamic = _first(event.dynamic)
-    if dynamic is not None:
-        note["dynamic"] = dynamic
-    style = _first(event.playing_style)
-    if style is not None:
-        note["playing_style"] = style
-    detuning = _first(event.custom_fields.get("detuning_cents"))
-    if detuning:
+    if dynamic and dynamic != shown.get("dynamic"):
+        note["dynamic"] = shown["dynamic"] = dynamic
+    style = next((s for s in event.playing_style if s not in m5.ARTICULATIONS), None)
+    if style and style != shown.get("playing_style"):
+        note["playing_style"] = shown["playing_style"] = style
+    articulations = [s for s in event.playing_style if s in m5.ARTICULATIONS]
+    if articulations:
+        note["articulations"] = articulations
+    detuning = list(event.custom_fields.get("detuning_cents") or [])
+    if pitches and any(detuning):
+        # One value per pitch; a single value applies to every pitch.
+        if len(detuning) != len(pitches):
+            detuning = [detuning[0]] * len(pitches)
         note["detuning_cents"] = detuning
     return note
 
@@ -146,7 +159,8 @@ def _sequence_to_payload(sequence) -> dict:
             ),
             None,
         )
-        notes = [_note_payload(start_ms, event) for start_ms, event in events]
+        shown: dict = {}
+        notes = [_note_payload(start_ms, event, shown) for start_ms, event in events]
         for note in notes:
             duration_ms = max(duration_ms, note["start_ms"] + note["duration_ms"])
         staves.append({"instrument": instrument, "notes": notes})
@@ -187,6 +201,11 @@ class ScoreViewer(io.ComfyNode):
         return io.NodeOutput(ui={"musicxml": [musicxml]})
 
 
+# Pixels per second of the Sequence Viewer at zoom 1 (the frontend's
+# BASE_PIXELS_PER_SECOND matches).
+BASE_PIXELS_PER_SECOND = 120.0
+
+
 class SequenceViewer(io.ComfyNode):
     """Display a raw, unquantized m5.Sequence as proportional, time-based notation.
 
@@ -207,14 +226,17 @@ class SequenceViewer(io.ComfyNode):
             inputs=[
                 m5Sequence.Input("sequence"),
                 io.Float.Input(
-                    "pixels_per_second",
-                    default=120.0,
-                    min=4.0,
-                    max=2000.0,
-                    step=4.0,
+                    "zoom",
+                    default=1.0,
+                    min=0.05,
+                    max=20.0,
+                    step=0.05,
+                    round=0.01,
                     tooltip=(
-                        "Horizontal time scale: how many pixels one second of the "
-                        "timeline occupies. Larger values spread events out; scroll "
+                        "Horizontal zoom of the time axis: 1 shows one second as "
+                        f"{BASE_PIXELS_PER_SECOND:g} pixels, 2 spreads events twice as "
+                        "far apart, 0.5 fits twice as much. Changing it redraws the "
+                        "viewer right away, without running the workflow. Scroll "
                         "the viewer horizontally to travel through time."
                     ),
                 ),
@@ -226,17 +248,14 @@ class SequenceViewer(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, sequence, pixels_per_second: float) -> io.NodeOutput:
+    def execute(cls, sequence, zoom: float = 1.0) -> io.NodeOutput:
         # `sequence` is the m5.Sequence carried by M5_SEQUENCE. Serialize it to the
         # plain JSON payload the frontend renders; the frontend reads
-        # message.sequence_data[0] and message.pixels_per_second[0].
+        # message.sequence_data[0] and message.zoom[0] (and then follows the
+        # zoom widget live).
         payload = _sequence_to_payload(sequence)
-        return io.NodeOutput(
-            ui={
-                "sequence_data": [payload],
-                "pixels_per_second": [pixels_per_second],
-            }
-        )
+        return io.NodeOutput(ui={"sequence_data": [payload], "zoom": [zoom]})
+
 
 def _write_preview_audio(audio: m5.Audio) -> dict:
     """Write an m5.Audio to ComfyUI's temp directory as FLAC for the frontend to

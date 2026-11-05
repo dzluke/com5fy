@@ -303,11 +303,11 @@
           "link": 9
         },
         {
-          "localized_name": "pixels_per_second",
-          "name": "pixels_per_second",
+          "localized_name": "zoom",
+          "name": "zoom",
           "type": "FLOAT",
           "widget": {
-            "name": "pixels_per_second"
+            "name": "zoom"
           },
           "link": null
         }
@@ -317,7 +317,7 @@
         "Node name for S&R": "m5_SequenceViewer"
       },
       "widgets_values": [
-        120,
+        1.0,
         ""
       ]
     },

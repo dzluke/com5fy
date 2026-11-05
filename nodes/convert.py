@@ -23,6 +23,12 @@ DATABASE_SETUP = (
 )
 
 
+# Orchidea's segments come from onset detection, not a beat, so its score keeps
+# the fixed tempo it always had (one quarter = one second) rather than an
+# estimated one.
+ORCHIDEA_BPM = 60.0
+
+
 class OrchideaNode(io.ComfyNode):
     """
     Orchestrate an input audio signal into an M5 score using m5.orchestrate.
@@ -273,7 +279,7 @@ class OrchideaNode(io.ComfyNode):
         # build the music21-backed Score the viewer/image rendering needs.
         # The raw orchestration.sequence is also exposed as an output so it can
         # be shown unquantized (proportional notation) by the Sequence Viewer.
-        score = m5.Score.from_sequence(orchestration.sequence)
+        score = m5.Score.from_sequence(orchestration.sequence, bpm=ORCHIDEA_BPM)
 
         if orchestration.audio is None:
             raise RuntimeError(
@@ -340,30 +346,21 @@ class ScoreToSequence(io.ComfyNode):
                 "Turns a score into a Sequence: notes and chords at their times "
                 "in milliseconds, one sub-Sequence per part. Keeps pitch (with "
                 "microtones), instrument, dynamics, text playing styles, "
-                "articulations and velocities. Ties are merged into one note; "
-                "rests become gaps."
+                "articulations and velocities. Timings follow the score's tempo "
+                "marks, tempo changes included (120 BPM if it has none). Ties are "
+                "merged into one note; rests become gaps."
             ),
             inputs=[
                 m5Score.Input("score"),
-                io.Float.Input(
-                    "bpm",
-                    default=0.0,
-                    min=0.0,
-                    max=1000.0,
-                    step=1.0,
-                    tooltip=(
-                        "Tempo used to turn beats into milliseconds. 0 uses the "
-                        "score's own tempo marks, tempo changes included (60 BPM "
-                        "if it has none)."
-                    ),
-                ),
             ],
             outputs=[m5Sequence.Output("sequence")],
         )
 
     @classmethod
-    def execute(cls, score, bpm: float = 0.0) -> io.NodeOutput:
-        return io.NodeOutput(score.to_sequence(bpm=bpm or None))
+    def execute(cls, score) -> io.NodeOutput:
+        # Timings come from the score's own metronome marks (120 BPM without
+        # any); m5's Score.to_sequence(bpm=...) can still force one tempo.
+        return io.NodeOutput(score.to_sequence())
 
 
 class SequenceToScore(io.ComfyNode):
@@ -377,7 +374,8 @@ class SequenceToScore(io.ComfyNode):
             category="m5/convert",
             description=(
                 "Turns a Sequence into a metered score: each sub-Sequence becomes "
-                "a part, and onsets and durations are snapped to a rhythmic grid."
+                "a part, and onsets and durations are snapped to a rhythmic grid. "
+                "The tempo is estimated from the onsets unless bpm is set."
             ),
             inputs=[
                 m5Sequence.Input("sequence"),
@@ -393,13 +391,15 @@ class SequenceToScore(io.ComfyNode):
                 ),
                 io.Float.Input(
                     "bpm",
-                    default=m5.DEFAULT_BPM,
-                    min=1.0,
+                    default=0.0,
+                    min=0.0,
                     max=1000.0,
                     step=1.0,
                     tooltip=(
                         "Tempo used to turn milliseconds into beats; written into "
-                        "the score as a metronome mark."
+                        "the score as a metronome mark. 0 estimates it from the "
+                        "notes: the tempo that puts the onsets on the simplest "
+                        "beat subdivisions, near a moderate tempo."
                     ),
                 ),
             ],
@@ -409,4 +409,4 @@ class SequenceToScore(io.ComfyNode):
     @classmethod
     def execute(cls, sequence, quantization: str, bpm: float) -> io.NodeOutput:
         grid = None if quantization == "none" else quantization
-        return io.NodeOutput(m5.Score.from_sequence(sequence, quantization=grid, bpm=bpm))
+        return io.NodeOutput(m5.Score.from_sequence(sequence, quantization=grid, bpm=bpm or None))
