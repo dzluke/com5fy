@@ -1,0 +1,17 @@
+{
+  "m5": {
+    "description": "M2.5: BPF (drawn points) -> BPF Rescale (200-8000) -> BPF Resample (250 ms) -> BPF (shows the input); Load BPF -> BPF.",
+    "markers": [],
+    "expect_outputs": ["1", "4", "6"]
+  },
+  "1": {"class_type": "m5_BPF", "inputs": {
+    "points": "[[0,0.1],[1000,0.8],[1500,0.8],[2500,0.25],[4000,0.1]]",
+    "duration_ms": 4000.0, "min": 0.0, "max": 1.0, "interpolation": "linear", "name": "brightness", "unit": ""}},
+  "2": {"class_type": "m5_BPFRescale", "inputs": {"bpf": ["1", 0], "low": 200.0, "high": 8000.0}},
+  "3": {"class_type": "m5_BPFResample", "inputs": {"bpf": ["2", 0], "step_ms": 250.0}},
+  "4": {"class_type": "m5_BPF", "inputs": {"input": ["3", 0],
+    "points": "[[0,0],[4000,1]]", "duration_ms": 4000.0, "min": 0.0, "max": 1.0, "interpolation": "linear", "name": "", "unit": ""}},
+  "5": {"class_type": "m5_LoadBPF", "inputs": {"file": "m5_swell.bpf.json", "interpolation": "from file"}},
+  "6": {"class_type": "m5_BPF", "inputs": {"input": ["5", 0],
+    "points": "[[0,0],[4000,1]]", "duration_ms": 4000.0, "min": 0.0, "max": 1.0, "interpolation": "linear", "name": "", "unit": ""}}
+}

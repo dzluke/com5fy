@@ -20,7 +20,7 @@ milestone first; tick the task and add a §9 session-log line when done. Project
 - Node ids are `m5_<Name>` (e.g. `m5_ScoreViewer`); never rename an existing id (it breaks saved workflows).
   Plan §3 wants categories under `m5/…` (`m5/convert`, `m5/edit`, `m5/io`…); the older nodes still use
   `audio` / `music`; new nodes use `m5/…` (Score/Sequence conversions are in `m5/convert`).
-- Custom types: `@io.comfytype(io_type="M5_…")` on an `io.ComfyTypeIO` subclass (`M5_SCORE`, `M5_SEQUENCE` so far),
+- Custom types: `@io.comfytype(io_type="M5_…")` on an `io.ComfyTypeIO` subclass (`M5_SCORE`, `M5_SEQUENCE`, `M5_BPF` so far),
   carrying the m5 object as-is.
 - Audio crosses node boundaries as ComfyUI's builtin `AUDIO` (`{"waveform": torch (B, C, T), "sample_rate"}`) so it
   connects to Load/Save Audio. Convert only with `_to_m5_audio` / `_to_comfy_audio` in `nodes/boundary.py` — the only places
@@ -38,7 +38,7 @@ milestone first; tick the task and add a §9 session-log line when done. Project
 - ComfyUI imports **every `*.js`** under `WEB_DIRECTORY = "./js"`, so the build emits exactly one: `js/com5fy.js`
   (React + all three viewers). OSMD and VexFlow are lazy chunks `js/chunks/*.mjs` (`.mjs` so ComfyUI doesn't import
   them at startup), loaded on first render. Don't add other `.js` outputs.
-- Layout: `ui/src/main.ts` imports one `register.tsx` per viewer (`score/`, `sequence/`, `audio/`); each does one
+- Layout: `ui/src/main.ts` imports one `register.tsx` per viewer (`score/`, `sequence/`, `audio/`, `bpf/` = the BPF node's curve editor); each does one
   `app.registerExtension`, mounts a React root into the node's DOM widget (`common/node.ts`: `chainCallback`,
   `fitNodeHeight`, the `M5Node` subset of LGraphNode we use), and unmounts it in `onRemoved`. OSMD/VexFlow draw
   imperatively into a childless React element (`common/ScrollPane.tsx`); the audio player's state/drawing lives in

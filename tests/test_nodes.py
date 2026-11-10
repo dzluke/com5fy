@@ -25,6 +25,10 @@ NODE_IDS = {
     "m5_SequenceToScore",
     "m5_LoadScore",
     "m5_AudioPlayback",
+    "m5_BPF",
+    "m5_LoadBPF",
+    "m5_BPFResample",
+    "m5_BPFRescale",
 }
 
 

@@ -146,10 +146,24 @@ Rule: if a function would be useful outside ComfyUI, it belongs in `m5`.
 | Descriptor | `m5.Descriptor` | `M5_DESCRIPTOR` | **todo**; named time series: `{name: (times_ms, values)}` + units/range, plus optional partials/frames matrices |
 | Text | `str` | builtin `STRING` | reuse builtin |
 | Number | `float` | builtin `FLOAT`/`INT` | reuse builtin |
-| BPF / automation | `m5.BPF` | `M5_BPF` | **todo**; `(time_ms, value)` points + interpolation mode + range |
+| BPF / automation | `m5.BPF` | `M5_BPF` | exists (M2.5); `(time_ms, value)` points + interpolation mode + range, see below |
 | Model handle | `m5.ModelRef` | `M5_MODEL` | **todo**; points at a loaded RAVE/AFTER/LoRA/LLM |
 | Time map | `m5.TimeMap` | — | exists (M2.2); tempo + meter map, ms ↔ quarters ↔ (measure, beat); see §2.3 |
 | Origin | `m5.Origin` | — | **todo**; attached to any representation, see 2.5 |
+
+**BPF details (M2.5).** `m5.BPF(points, interpolation="linear", range=None, name="", unit="")`, a plain dataclass
+(`bpf.py`). Points are sorted by time; two points at one time are a jump (the later one wins). Interpolation
+(`m5.INTERPOLATIONS`): `step` (hold), `linear`, `exp` = geometric (constant ratio, for Hz/amplitude; segments through
+0 or a sign change fall back to linear). Outside its points a BPF holds the end values (DAW automation). `range` is the
+declared range of the controlled parameter (e.g. 0–127), `None` = the span of the points (`value_range`); `rescale`
+maps from it and clears `unit`. `resample(step_ms)` keeps the end point. Files: JSON `{"points": [[t, v]…],
+"interpolation", "range", "name", "unit"}` (or a bare list of pairs), CSV `time_ms,<name>` rows (points only).
+**BPFs are mainly made by drawing them in the BPF node** (user decision 2026-11-10, M2.5 feedback). The `m5_BPF`
+node (`m5/create`, `nodes/create.py`, frontend `ui/src/bpf/`) is a curve editor like Max's `function` / DAW automation:
+its `points` widget (JSON `[[t, v]…]`) is swapped for the editor, so points are saved in the workflow and sent to the
+backend; `duration_ms`, `min`/`max` (= the BPF's `range`), `interpolation`, `name`, `unit` are widgets. With a BPF on
+its optional `input` it shows that curve read-only and passes it through, so it is also the BPF viewer ("Edit a copy"
+copies it into the editor). This node is the **exception to "data nodes are display-only"** (§7). No Preview as Text.
 
 ### 2.3 Sequence as the conversion hub
 
@@ -365,7 +379,9 @@ M13 = release work done along the way.
   proportional scores keep raw ms timings (spec: Score nodes support both). *Depends on:* M2.2.
 - [ ] **M2.4 `Midi` type.** Read/write `.mid`, `from_sequence` / `to_sequence`, tempo map, CC lanes → BPFs.
   *Depends on:* M2.2.
-- [ ] **M2.5 `BPF` type.** Points, interpolation (step/linear/exp), resample to a grid, rescale range, read/write JSON/CSV.
+- [~] **M2.5 `BPF` type.** Points, interpolation (step/linear/exp), resample to a grid, rescale range, read/write JSON/CSV.
+  m5 type, Load BPF / Rescale / Resample and the drawable BPF node (curve editor) work and are tested; left: the
+  user's review of the editor, polish (see `docs/changes/2026-11-10_M2.5.md` › Status).
 - [ ] **M2.6 `Descriptor` type.** Named time series + units + range; frame matrices (e.g. partials: time × (freq, amp));
   `to_bpf(name)`, `to_sequence()` (onsets/partials as events); read/write JSON/CSV and SDIF if a library is available.
 - [ ] **M2.7 `Origin`.** Dataclass from §2.5, optional field on Audio/Score/Midi/Descriptor/BPF/Sequence;
@@ -388,6 +404,7 @@ Spec: data nodes display only (no editing); each keeps a history of versions you
 - [ ] **M3.5 Descriptor node.** Table view + line plot per descriptor (spec says table; plot is cheap to add).
   *Depends on:* M2.6.
 - [ ] **M3.6 Control-data nodes.** Text (builtin is fine), Number (builtin), BPF node with a curve display. *Depends on:* M2.5.
+  The BPF node with its curve editor (draw + display) was done in M2.5; what is left here is history (M3.1).
 - [ ] **M3.7 Audio node.** Fold `m5_AudioPlayback` into the shared history mechanism. *Depends on:* M3.2.
 
 ### M4 — Symbolic conversions and analysis (W3 groundwork)
@@ -528,6 +545,7 @@ Priority (user decision): **MuseScore, Ableton, Premiere**. Max/bach (M7.4) and 
 
 - Real-time generation or performance use. Everything is offline / studio.
 - Editing musical representations inside the display nodes (display only; editing happens with transformation nodes or external software).
+  Exception: the BPF node, where BPFs are drawn (user decision 2026-11-10, §2.2).
 - Collaborative performer scores (spec open question; not planned unless the user adds it).
 
 ## 8. Open questions and gaps
@@ -635,3 +653,8 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
   com5fy: Sequence to Score `bpm` 0 = the Sequence's map, else estimate (tooltips); workflow `M2.2_timemap` (UI + API,
   checked in the browser); M2.1 Note updated. · Open: no accel./rit. ramps; measure numbers computed, not read;
   Sequence Viewer draws no barlines yet. Next: M2.3 / M2.4.
+- 2026-11-10 · M2.5 (+ feedback round, partly done) · m5: `BPF` (`bpf.py`: points, step/linear/exp, evaluate, resample,
+  rescale, JSON/CSV, `from_arrays`). com5fy: `M5_BPF`, Load BPF, BPF Rescale/Resample; after feedback ("draw BPFs in the
+  node, no text view") the `m5_BPF` node with a React/canvas curve editor (add/drag/delete, Shift snap, Alt value-only,
+  hover values, input shown read-only + Edit a copy), checked in the browser; workflow `M2.5_bpf` (UI + API). · Open:
+  user review of the editor; see the change note's resume section. Next: finish M2.5, then M2.3 / M2.4.

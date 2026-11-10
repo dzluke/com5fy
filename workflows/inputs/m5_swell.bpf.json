@@ -1,0 +1,7 @@
+{
+  "name": "brightness",
+  "unit": "Hz",
+  "interpolation": "linear",
+  "range": [0, 8000],
+  "points": [[0, 500], [1000, 4000], [1500, 4000], [2500, 1000], [4000, 500]]
+}

@@ -1,0 +1,562 @@
+{
+ "id": "00000000-0000-0000-0000-000000000000",
+ "revision": 0,
+ "last_node_id": 7,
+ "last_link_id": 4,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "m5_BPF",
+   "pos": [
+    40,
+    60
+   ],
+   "size": [
+    520,
+    420
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "input",
+     "name": "input",
+     "shape": 7,
+     "type": "M5_BPF",
+     "link": null
+    },
+    {
+     "localized_name": "points",
+     "name": "points",
+     "type": "STRING",
+     "widget": {
+      "name": "points"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "duration_ms",
+     "name": "duration_ms",
+     "type": "FLOAT",
+     "widget": {
+      "name": "duration_ms"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "min",
+     "name": "min",
+     "type": "FLOAT",
+     "widget": {
+      "name": "min"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "max",
+     "name": "max",
+     "type": "FLOAT",
+     "widget": {
+      "name": "max"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "interpolation",
+     "name": "interpolation",
+     "type": "COMBO",
+     "widget": {
+      "name": "interpolation"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "name",
+     "name": "name",
+     "type": "STRING",
+     "widget": {
+      "name": "name"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "unit",
+     "name": "unit",
+     "type": "STRING",
+     "widget": {
+      "name": "unit"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "bpf",
+     "name": "bpf",
+     "type": "M5_BPF",
+     "links": [
+      1
+     ]
+    }
+   ],
+   "title": "BPF (draw here)",
+   "properties": {
+    "Node name for S&R": "m5_BPF"
+   },
+   "widgets_values": [
+    4000,
+    0,
+    1,
+    "linear",
+    "brightness",
+    "",
+    "[[0,0.1],[1000,0.8],[1500,0.8],[2500,0.25],[4000,0.1]]"
+   ]
+  },
+  {
+   "id": 2,
+   "type": "m5_BPFRescale",
+   "pos": [
+    600,
+    60
+   ],
+   "size": [
+    270,
+    112
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "bpf",
+     "name": "bpf",
+     "type": "M5_BPF",
+     "link": 1
+    },
+    {
+     "localized_name": "low",
+     "name": "low",
+     "type": "FLOAT",
+     "widget": {
+      "name": "low"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "high",
+     "name": "high",
+     "type": "FLOAT",
+     "widget": {
+      "name": "high"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "bpf",
+     "name": "bpf",
+     "type": "M5_BPF",
+     "links": [
+      2
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "m5_BPFRescale"
+   },
+   "widgets_values": [
+    200,
+    8000
+   ]
+  },
+  {
+   "id": 3,
+   "type": "m5_BPFResample",
+   "pos": [
+    600,
+    230
+   ],
+   "size": [
+    270,
+    104
+   ],
+   "flags": {},
+   "order": 5,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "bpf",
+     "name": "bpf",
+     "type": "M5_BPF",
+     "link": 2
+    },
+    {
+     "localized_name": "step_ms",
+     "name": "step_ms",
+     "type": "FLOAT",
+     "widget": {
+      "name": "step_ms"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "bpf",
+     "name": "bpf",
+     "type": "M5_BPF",
+     "links": [
+      3
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "m5_BPFResample"
+   },
+   "widgets_values": [
+    250
+   ]
+  },
+  {
+   "id": 4,
+   "type": "m5_BPF",
+   "pos": [
+    900,
+    60
+   ],
+   "size": [
+    520,
+    420
+   ],
+   "flags": {},
+   "order": 6,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "input",
+     "name": "input",
+     "shape": 7,
+     "type": "M5_BPF",
+     "link": 3
+    },
+    {
+     "localized_name": "points",
+     "name": "points",
+     "type": "STRING",
+     "widget": {
+      "name": "points"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "duration_ms",
+     "name": "duration_ms",
+     "type": "FLOAT",
+     "widget": {
+      "name": "duration_ms"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "min",
+     "name": "min",
+     "type": "FLOAT",
+     "widget": {
+      "name": "min"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "max",
+     "name": "max",
+     "type": "FLOAT",
+     "widget": {
+      "name": "max"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "interpolation",
+     "name": "interpolation",
+     "type": "COMBO",
+     "widget": {
+      "name": "interpolation"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "name",
+     "name": "name",
+     "type": "STRING",
+     "widget": {
+      "name": "name"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "unit",
+     "name": "unit",
+     "type": "STRING",
+     "widget": {
+      "name": "unit"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "bpf",
+     "name": "bpf",
+     "type": "M5_BPF",
+     "links": null
+    }
+   ],
+   "title": "Rescaled 200–8000, resampled every 250 ms",
+   "properties": {
+    "Node name for S&R": "m5_BPF"
+   },
+   "widgets_values": [
+    4000,
+    0,
+    1,
+    "linear",
+    "",
+    "",
+    "[[0,0],[4000,1]]"
+   ]
+  },
+  {
+   "id": 5,
+   "type": "m5_LoadBPF",
+   "pos": [
+    40,
+    560
+   ],
+   "size": [
+    270,
+    141.328125
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "file",
+     "name": "file",
+     "type": "COMBO",
+     "widget": {
+      "name": "file"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "interpolation",
+     "name": "interpolation",
+     "type": "COMBO",
+     "widget": {
+      "name": "interpolation"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "bpf",
+     "name": "bpf",
+     "type": "M5_BPF",
+     "links": [
+      4
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "m5_LoadBPF"
+   },
+   "widgets_values": [
+    "m5_swell.bpf.json",
+    "from file"
+   ]
+  },
+  {
+   "id": 6,
+   "type": "m5_BPF",
+   "pos": [
+    600,
+    560
+   ],
+   "size": [
+    520,
+    420
+   ],
+   "flags": {},
+   "order": 4,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "input",
+     "name": "input",
+     "shape": 7,
+     "type": "M5_BPF",
+     "link": 4
+    },
+    {
+     "localized_name": "points",
+     "name": "points",
+     "type": "STRING",
+     "widget": {
+      "name": "points"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "duration_ms",
+     "name": "duration_ms",
+     "type": "FLOAT",
+     "widget": {
+      "name": "duration_ms"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "min",
+     "name": "min",
+     "type": "FLOAT",
+     "widget": {
+      "name": "min"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "max",
+     "name": "max",
+     "type": "FLOAT",
+     "widget": {
+      "name": "max"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "interpolation",
+     "name": "interpolation",
+     "type": "COMBO",
+     "widget": {
+      "name": "interpolation"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "name",
+     "name": "name",
+     "type": "STRING",
+     "widget": {
+      "name": "name"
+     },
+     "link": null
+    },
+    {
+     "localized_name": "unit",
+     "name": "unit",
+     "type": "STRING",
+     "widget": {
+      "name": "unit"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "bpf",
+     "name": "bpf",
+     "type": "M5_BPF",
+     "links": null
+    }
+   ],
+   "title": "Loaded from file",
+   "properties": {
+    "Node name for S&R": "m5_BPF"
+   },
+   "widgets_values": [
+    4000,
+    0,
+    1,
+    "linear",
+    "",
+    "",
+    "[[0,0],[4000,1]]"
+   ]
+  },
+  {
+   "id": 7,
+   "type": "Note",
+   "pos": [
+    1460,
+    60
+   ],
+   "size": [
+    420,
+    560
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "title": "M2.5 · BPF",
+   "properties": {},
+   "widgets_values": [
+    "M2.5: BPF (break-point function / automation curve), drawn in the node.\n\nBPF (draw here), top left: the curve editor.\n- click empty space: add a point (keep the button down to drag it)\n- drag a point: move it (Shift: snap to the grid, Alt: value only)\n- double-click or right-click a point, or select it and press Delete: remove it\n- hover: the point's time and value; elsewhere, the curve's value under the cursor\nduration_ms, min and max set the box; interpolation (step / linear / exp) redraws at once.\n\nPress Run. Look at:\n1. \"Rescaled 200–8000, resampled every 250 ms\": a BPF node with a BPF on its input shows that curve read-only (green) and passes it on: your drawing mapped from 0–1 to 200–8000 and sampled every 250 ms (17 points).\n2. \"Loaded from file\": input/m5_swell.bpf.json (Load BPF) shown the same way. \"Edit a copy\" copies it into the editor and disconnects the input.\n\nSave and reopen the workflow: the drawn points are kept."
+   ],
+   "color": "#432",
+   "bgcolor": "#653"
+  }
+ ],
+ "links": [
+  [
+   1,
+   1,
+   0,
+   2,
+   0,
+   "M5_BPF"
+  ],
+  [
+   2,
+   2,
+   0,
+   3,
+   0,
+   "M5_BPF"
+  ],
+  [
+   3,
+   3,
+   0,
+   4,
+   0,
+   "M5_BPF"
+  ],
+  [
+   4,
+   5,
+   0,
+   6,
+   0,
+   "M5_BPF"
+  ]
+ ],
+ "groups": [],
+ "config": {},
+ "extra": {
+  "ds": {
+   "scale": 0.55,
+   "offset": [
+    20,
+    40
+   ]
+  }
+ },
+ "version": 0.4
+}

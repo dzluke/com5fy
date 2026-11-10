@@ -17,6 +17,11 @@ from .nodes import (
     SequenceToScore,
     LoadScore,
     AudioPlayback,
+    m5BPF,
+    BPFNode,
+    LoadBPF,
+    BPFResample,
+    BPFRescale,
     m5Extension,
     comfy_entrypoint,
 )
@@ -33,6 +38,11 @@ __all__ = [
     "SequenceToScore",
     "LoadScore",
     "AudioPlayback",
+    "m5BPF",
+    "BPFNode",
+    "LoadBPF",
+    "BPFResample",
+    "BPFRescale",
     "m5Extension",
     "comfy_entrypoint",
 ]

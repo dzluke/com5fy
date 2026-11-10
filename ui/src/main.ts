@@ -3,3 +3,4 @@
 import "./score/register";
 import "./sequence/register";
 import "./audio/register";
+import "./bpf/register";
