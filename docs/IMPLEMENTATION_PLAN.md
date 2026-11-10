@@ -65,7 +65,8 @@ ComfyUI/                         upstream ComfyUI checkout (not a git repo here)
 ├── mmmmm/                       git repo — core library, package name `m5`
 │   └── src/m5/
 │       ├── audio.py             Audio(waveform: np.ndarray (C, T) float32, sample_rate)
-│       ├── time.py              Event (duration ms + list-valued fields), Sequence ((start_ms, item) list, nestable)
+│       ├── time.py              Event (duration ms + list-valued fields), Sequence ((start_ms, item) list, nestable, optional time_map)
+│       ├── timemap.py           TimeMap: tempo + meter changes, pickup; ms ⇄ quarters ⇄ (measure, beat); from score / MIDI
 │       ├── score.py             Score (wraps music21.stream.Score), from_file, from_sequence (quantize), to_sequence, to_musicxml
 │       ├── render.py            render_sequence(Sequence) -> Audio (mixes audio carried by events)
 │       ├── orchidea.py          orchestrate(Audio, params, database) -> Orchestration; SoundDatabase; connection.txt parser
@@ -147,7 +148,7 @@ Rule: if a function would be useful outside ComfyUI, it belongs in `m5`.
 | Number | `float` | builtin `FLOAT`/`INT` | reuse builtin |
 | BPF / automation | `m5.BPF` | `M5_BPF` | **todo**; `(time_ms, value)` points + interpolation mode + range |
 | Model handle | `m5.ModelRef` | `M5_MODEL` | **todo**; points at a loaded RAVE/AFTER/LoRA/LLM |
-| Time map | `m5.TimeMap` | — | **todo**; tempo + meter map, measures ↔ ms |
+| Time map | `m5.TimeMap` | — | exists (M2.2); tempo + meter map, ms ↔ quarters ↔ (measure, beat); see §2.3 |
 | Origin | `m5.Origin` | — | **todo**; attached to any representation, see 2.5 |
 
 ### 2.3 Sequence as the conversion hub
@@ -188,6 +189,22 @@ cents annotations in spectral scores). `from_sequence` writes ±50 as quarter-to
 `quarter-flat` etc., what notation software shows) and other values as microtones (fractional `alter`); the Sequence
 Viewer draws ±50 as quarter-tone accidentals and other deviations as a cents label.
 `from_sequence` parses names with the same rules (it used to pass them to music21, which read `"C-1"` as C♭1).
+**TimeMap** (M2.2, `timemap.py`): tempo changes (`TempoChange(quarters, bpm, referent)`, the referent kept so ♩. = 60
+is written back as such) and meter changes (`MeterChange(quarters, numerator, denominator)`), both keyed by position in
+**quarter notes**, plus `pickup` (quarters of an anacrusis, numbered `first_measure - 1`) and `first_measure` (1, or more
+for an excerpt). A meter change starts a new measure; mid-measure (MIDI can do it) the measure before is cut short.
+Beats are 1-based in units of the meter's denominator (6/8 counts eighths); pickup beats count from the end of the bar
+(a one-quarter pickup in 4/4 is beat 4). Tempo changes are instantaneous (no accel./rit. ramps yet).
+Sources: `TimeMap.from_score` / `Score.time_map` (metronome marks, time signatures, first measure's `paddingLeft`),
+`TimeMap.from_midi_events(tpq, tempos, time_signatures)` + `to_midi_events` (the hook for `m5.Midi`, M2.4, independent
+of the MIDI library) and `TimeMap.from_midi_file` (music21's MIDI reader, no new dependency).
+**A Sequence carries an optional `time_map`** (decision 2026-11-10): ms stay authoritative, the map only interprets
+them; only the outermost Sequence's map counts. `Score.to_sequence` sets it; `Score.from_sequence` picks its map as:
+explicit `time_map=` › the Sequence's map › with `bpm` given, one tempo in the Sequence's *first* meter only (a forced
+tempo moves its later barlines in time) or 4/4 › estimated tempo in 4/4. So Score → Sequence → Score keeps tempo and
+meter changes and the pickup; `Sequence to Score` `bpm` 0 now means "the Sequence's map, else estimate". Time
+signatures are written into every part, tempo marks into the first; a pickup is made by `_make_pickup` (measures made
+with the music shifted by the unplayed part of bar 0, then shifted back with `paddingLeft`).
 
 ### 2.4 Engines
 
@@ -340,8 +357,10 @@ M13 = release work done along the way.
   instrument, pitch (incl. microtones), dynamics, playing styles. Round-trip tests.
   Done as `Score.to_sequence(bpm=None)` (score's metronome marks, or one tempo); M2.2 swaps the private
   `_tempo_map` for a `TimeMap`. Nodes `m5_ScoreToSequence` / `m5_SequenceToScore` (`m5/convert`).
-- [ ] **M2.2 `TimeMap`.** Tempo changes + meter changes; `ms_to_measure_beat`, `measure_beat_to_ms`, `ms_to_quarters`.
+- [x] **M2.2 `TimeMap`.** Tempo changes + meter changes; `ms_to_measure_beat`, `measure_beat_to_ms`, `ms_to_quarters`.
   Score uses it instead of the fixed `DEFAULT_BPM`. Extract from music21 scores and MIDI files.
+  Done as `m5.TimeMap` (`timemap.py`, §2.3); `Sequence.time_map` (optional) makes Score → Sequence → Score keep tempo
+  and meter changes and the pickup; `from_midi_events` / `to_midi_events` are the hook for M2.4.
 - [ ] **M2.3 Proportional vs metered scores.** `Score` gets a `notation` mode (`metered` | `proportional`);
   proportional scores keep raw ms timings (spec: Score nodes support both). *Depends on:* M2.2.
 - [ ] **M2.4 `Midi` type.** Read/write `.mid`, `from_sequence` / `to_sequence`, tempo map, CC lanes → BPFs.
@@ -608,3 +627,11 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
   pinned rest positions to dodge an OSMD 1.9.0 crash (2nd-voice rest next to a quarter tone); Orchidea node pins 60 BPM.
   Workflows M2.1 and M1.4 updated; checked in the browser. · Open: the half/double-tempo choice is a heuristic; a
   Sequence still carries no tempo map (M2.2). Next: M2.2.
+- 2026-11-10 · M2.2 · m5: `TimeMap` (new `timemap.py`; `TempoChange` with referent, `MeterChange` keyed by quarter
+  position, pickup, first measure; ms ⇄ quarters ⇄ (measure, beat); `from_score` / `Score.time_map`,
+  `from_midi_events` / `to_midi_events`, `from_midi_file` via music21); `Sequence.time_map` (optional);
+  `to_sequence` sets it, `from_sequence(time_map=)` writes tempo marks, time signatures and a pickup bar back (private
+  `_tempo_map` removed); forced `bpm` keeps only the first meter. Fixture `meters_tempi.musicxml` (both repos).
+  com5fy: Sequence to Score `bpm` 0 = the Sequence's map, else estimate (tooltips); workflow `M2.2_timemap` (UI + API,
+  checked in the browser); M2.1 Note updated. · Open: no accel./rit. ramps; measure numbers computed, not read;
+  Sequence Viewer draws no barlines yet. Next: M2.3 / M2.4.

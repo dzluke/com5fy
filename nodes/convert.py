@@ -348,7 +348,9 @@ class ScoreToSequence(io.ComfyNode):
                 "microtones), instrument, dynamics, text playing styles, "
                 "articulations and velocities. Timings follow the score's tempo "
                 "marks, tempo changes included (120 BPM if it has none). Ties are "
-                "merged into one note; rests become gaps."
+                "merged into one note; rests become gaps. The Sequence also "
+                "carries the score's tempo and meter map, so Sequence to Score "
+                "can write the same tempos, time signatures and pickup back."
             ),
             inputs=[
                 m5Score.Input("score"),
@@ -359,7 +361,8 @@ class ScoreToSequence(io.ComfyNode):
     @classmethod
     def execute(cls, score) -> io.NodeOutput:
         # Timings come from the score's own metronome marks (120 BPM without
-        # any); m5's Score.to_sequence(bpm=...) can still force one tempo.
+        # any), and the Sequence carries the score's TimeMap; m5's
+        # Score.to_sequence(bpm=...) can still force one tempo.
         return io.NodeOutput(score.to_sequence())
 
 
@@ -375,7 +378,9 @@ class SequenceToScore(io.ComfyNode):
             description=(
                 "Turns a Sequence into a metered score: each sub-Sequence becomes "
                 "a part, and onsets and durations are snapped to a rhythmic grid. "
-                "The tempo is estimated from the onsets unless bpm is set."
+                "A Sequence made from a score keeps that score's tempo changes, "
+                "time signatures and pickup; otherwise the tempo is estimated "
+                "from the onsets (4/4). bpm forces one tempo."
             ),
             inputs=[
                 m5Sequence.Input("sequence"),
@@ -397,9 +402,13 @@ class SequenceToScore(io.ComfyNode):
                     step=1.0,
                     tooltip=(
                         "Tempo used to turn milliseconds into beats; written into "
-                        "the score as a metronome mark. 0 estimates it from the "
-                        "notes: the tempo that puts the onsets on the simplest "
-                        "beat subdivisions, near a moderate tempo."
+                        "the score as a metronome mark. 0 uses the Sequence's own "
+                        "tempo map (tempo and meter changes, from Score to "
+                        "Sequence) when it has one, else estimates one tempo from "
+                        "the notes: the one that puts the onsets on the simplest "
+                        "beat subdivisions, near a moderate tempo. A bpm other "
+                        "than 0 replaces the tempo changes with this one tempo "
+                        "and keeps only the first time signature."
                     ),
                 ),
             ],
