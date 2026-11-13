@@ -22,6 +22,10 @@ from .nodes import (
     LoadBPF,
     BPFResample,
     BPFRescale,
+    m5Descriptor,
+    LoadDescriptor,
+    DescriptorToSequence,
+    DescriptorToBPF,
     m5Extension,
     comfy_entrypoint,
 )
@@ -43,6 +47,10 @@ __all__ = [
     "LoadBPF",
     "BPFResample",
     "BPFRescale",
+    "m5Descriptor",
+    "LoadDescriptor",
+    "DescriptorToSequence",
+    "DescriptorToBPF",
     "m5Extension",
     "comfy_entrypoint",
 ]

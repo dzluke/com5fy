@@ -97,6 +97,9 @@ Frontend: edit `ui/src/`, then `cd ui && npm ci && npm run build` (reproducible)
 | `m5_ScoreToSequence`  | Score → Sequence (`Score.to_sequence`: the score's tempo marks, 120 BPM without) |
 | `m5_SequenceToScore`  | Sequence → Score (`Score.from_sequence`: quantization grid + bpm, 0 = estimated) |
 | `m5_AudioPlayback`    | waveform display + playback |
+| `m5_LoadDescriptor`   | `.json`/`.csv` from `input/` → Descriptor (M2.6) |
+| `m5_DescriptorToSequence` | onsets (+ pitch track) and/or partials → Sequence (M2.6) |
+| `m5_DescriptorToBPF`  | one descriptor series → BPF (M2.6) |
 
 Nodes use the new `comfy_api.latest.io` schema API (`io.ComfyNode`, `define_schema`, `ComfyExtension`).
 Audio crosses the node boundary as ComfyUI's builtin `AUDIO` (`{"waveform": torch (B, C, T), "sample_rate"}`),
@@ -143,7 +146,7 @@ Rule: if a function would be useful outside ComfyUI, it belongs in `m5`.
 | Sequence | `m5.Sequence` | `M5_SEQUENCE` | exists; ms timebase |
 | Score | `m5.Score` | `M5_SCORE` | exists; music21-backed. Needs metered + proportional modes |
 | MIDI | `m5.Midi` | `M5_MIDI` | **todo**; wraps a list of tracks/notes/CCs + tempo map (via `mido` or `pretty_midi`) |
-| Descriptor | `m5.Descriptor` | `M5_DESCRIPTOR` | **todo**; named time series: `{name: (times_ms, values)}` + units/range, plus optional partials/frames matrices |
+| Descriptor | `m5.Descriptor` | `M5_DESCRIPTOR` | exists (M2.6); named `TimeSeries` (times_ms, values, unit, range) + `FrameMatrix` tracks (partials…), see below |
 | Text | `str` | builtin `STRING` | reuse builtin |
 | Number | `float` | builtin `FLOAT`/`INT` | reuse builtin |
 | BPF / automation | `m5.BPF` | `M5_BPF` | exists (M2.5); `(time_ms, value)` points + interpolation mode + range, see below |
@@ -164,6 +167,36 @@ its `points` widget (JSON `[[t, v]…]`) is swapped for the editor, so points ar
 backend; `duration_ms`, `min`/`max` (= the BPF's `range`), `interpolation`, `name`, `unit` are widgets. With a BPF on
 its optional `input` it shows that curve read-only and passes it through, so it is also the BPF viewer ("Edit a copy"
 copies it into the editor). This node is the **exception to "data nodes are display-only"** (§7). No Preview as Text.
+
+**Descriptor details (M2.6).** `m5.Descriptor(series, matrices, length_ms=None)`, a plain dataclass
+(`descriptor.py`): `series: {name: TimeSeries(times_ms, values, unit="", range=None)}` (one value per time point,
+points need not be evenly spaced, NaN = missing, e.g. unvoiced f0) and `matrices: {name: FrameMatrix(times_ms,
+frames, columns, units)}` (one rows × columns matrix per frame, row count may vary: partials as SDIF `1TRC`-style
+`index, frequency, amplitude` rows). Names are unique across both. `length_ms` = length of the analysed signal
+(else `duration` is the last point). **Generic on purpose** (§8 item 6 still open): no list of known descriptors;
+names and units come from whoever makes the data, and a name only gets a meaning where the caller says so.
+The only fixed vocabulary: partials columns are found by name (`frequency`/`freq`, `amplitude`/`amp`,
+`index`/`id`, case-insensitive), and a pitch track's unit says how to read it (`Hz` or none, `MIDI`/`semitones`,
+`midicents`/`mc`/`cents`).
+`to_bpf(name, interpolation)` → `m5.BPF` with the same name/unit/range, NaN points dropped.
+`to_sequence(onsets=, pitch=, partials=, min_partial_ms=0)`: onsets → one Event per onset lasting to the next
+(the last to `duration`), pitched at the median of `pitch` over the segment (nearest pitch + `detuning_cents`, §2.3;
+no pitch values = unpitched), other series' segment means in custom fields of the same name; partials → one Event
+per partial index (first frame to last + one hop), at the amplitude-weighted mean frequency, other columns' means in
+custom fields (no index column: one event per row). Each source is one sub-Sequence whose events carry
+`instrument=<descriptor name>` (a staff / part named after it). Velocities and dynamics aren't derived (units of
+loudness/amplitude vary); per-frame trajectories (glissandi) aren't kept on the events.
+Files: JSON `{"length_ms", "series": {name: {"unit", "range", "times_ms", "values"}}, "matrices": {name: {"columns",
+"units", "times_ms", "frames"}}}` (`null` = NaN; a series may also be a bare list of `[t, v]` pairs), one frame per
+line; CSV: a time column (`time_ms`, or seconds for `time_s`/`time (s)`/`time`) then one column per series with
+`name [unit]` headers (empty cell = no point, `nan` = missing value), or, when times repeat, one frame matrix per file
+(named after the file); CSV keeps no ranges. **SDIF is later work:** `pysdif3` 1.0.1 (latest, July 2024; cp312
+arm64 wheels) writes fine but cannot open a file whose first frame is an undeclared standard type such as plain
+`1TRC` (`TypeError` in `SdifFile.__init__`, a bytes/str bug), which is the usual SDIF from partial trackers; revisit
+when fixed upstream, or read `1TRC`/`1FQ0` with a small reader of our own. Until the Descriptor viewer (M3.5),
+descriptors are shown with **Preview as Text** (`str(Descriptor)`: one line per track). Nodes: `m5_LoadDescriptor`
+(`m5/io`, `.json`/`.csv` from `input/`; the M7.1 importer), `m5_DescriptorToSequence` and `m5_DescriptorToBPF`
+(`m5/convert`; the §2.3 hub step and M4.6's "pick a descriptor as a BPF", which M4.6 extends with rescale/threshold).
 
 ### 2.3 Sequence as the conversion hub
 
@@ -382,8 +415,10 @@ M13 = release work done along the way.
 - [~] **M2.5 `BPF` type.** Points, interpolation (step/linear/exp), resample to a grid, rescale range, read/write JSON/CSV.
   m5 type, Load BPF / Rescale / Resample and the drawable BPF node (curve editor) work and are tested; left: the
   user's review of the editor, polish (see `docs/changes/2026-11-10_M2.5.md` › Status).
-- [ ] **M2.6 `Descriptor` type.** Named time series + units + range; frame matrices (e.g. partials: time × (freq, amp));
+- [x] **M2.6 `Descriptor` type.** Named time series + units + range; frame matrices (e.g. partials: time × (freq, amp));
   `to_bpf(name)`, `to_sequence()` (onsets/partials as events); read/write JSON/CSV and SDIF if a library is available.
+  Done as `m5.Descriptor` (`TimeSeries` + `FrameMatrix`, §2.2); JSON/CSV only, SDIF later (pysdif3 can't open plain
+  `1TRC`). Nodes `m5_LoadDescriptor`, `m5_DescriptorToSequence`, `m5_DescriptorToBPF`.
 - [ ] **M2.7 `Origin`.** Dataclass from §2.5, optional field on Audio/Score/Midi/Descriptor/BPF/Sequence;
   copied through transformations by a helper.
 - [ ] **M2.8 Serialization.** Each type gets `to_dict` / `from_dict` (JSON-safe, audio by file reference) — needed for
@@ -566,6 +601,7 @@ What's below is still missing. A session that reaches one of these should ask th
 
 5. Score → audio without AFTER (M4.7): sample database, soundfont, or simple synth?
 6. Which descriptors matter, their units and ranges, and whether partials data is needed (M2.6, M4.3).
+   M2.6 kept `m5.Descriptor` generic (any names/units, partials supported, §2.2), so this is now only M4.3's choice.
 7. How proportional notation should look in the Score node (M2.3, M3.3).
 8. What counts as "good enough" for Score + text editing — e.g. a pass rate on the W7 test set (M5.4).
 
@@ -658,3 +694,9 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
   node, no text view") the `m5_BPF` node with a React/canvas curve editor (add/drag/delete, Shift snap, Alt value-only,
   hover values, input shown read-only + Edit a copy), checked in the browser; workflow `M2.5_bpf` (UI + API). · Open:
   user review of the editor; see the change note's resume section. Next: finish M2.5, then M2.3 / M2.4.
+- 2026-11-13 · M2.6 · m5: `Descriptor` (`descriptor.py`: named `TimeSeries` with unit/range/NaN gaps, `FrameMatrix`
+  tracks such as partials; `to_bpf`, `to_sequence(onsets, pitch, partials, min_partial_ms)`, JSON/CSV; design in §2.2),
+  fixture `melody.desc.json`, 22 tests. com5fy: `M5_DESCRIPTOR`, Load Descriptor, Descriptor to Sequence, Descriptor
+  to BPF; workflow `M2.6_descriptor` (UI + API, checked in the browser; the f0 BPF is shown in a read-only BPF node,
+  following the M2.5 feedback). · Open: SDIF (pysdif3 bug), user feedback (change note), Descriptor viewer is M3.5;
+  M2.5 editor review still pending. Next: M2.3 / M2.4.

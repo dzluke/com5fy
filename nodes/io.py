@@ -8,7 +8,7 @@ from comfy_api.latest import io
 
 import m5
 
-from .types import m5BPF, m5Score
+from .types import m5BPF, m5Descriptor, m5Score
 
 BPF_EXTENSIONS = (".json", ".csv")
 FROM_FILE = "from file"
@@ -99,4 +99,58 @@ class LoadBPF(io.ComfyNode):
     def validate_inputs(cls, file: str, interpolation: str = FROM_FILE) -> bool | str:
         if not folder_paths.exists_annotated_filepath(file):
             return f"BPF file not found in input/: {file}"
+        return True
+
+
+DESCRIPTOR_EXTENSIONS = (".json", ".csv")
+
+
+def _descriptor_files() -> list[str]:
+    """Descriptor files (``.json`` / ``.csv``) in ComfyUI's ``input/`` folder, for the dropdown."""
+    input_dir = folder_paths.get_input_directory()
+    os.makedirs(input_dir, exist_ok=True)
+    return sorted(f for f in os.listdir(input_dir) if f.lower().endswith(DESCRIPTOR_EXTENSIONS))
+
+
+class LoadDescriptor(io.ComfyNode):
+    """Load a Descriptor (analysis tracks: f0, loudness, onsets, partials…) from a JSON or CSV
+    file in ComfyUI's ``input/`` folder (formats: ``m5.Descriptor.from_json`` / ``from_csv``)."""
+
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="m5_LoadDescriptor",
+            display_name="Load Descriptor",
+            category="m5/io",
+            inputs=[
+                io.Combo.Input(
+                    "file",
+                    options=_descriptor_files(),
+                    tooltip=(
+                        "A .json or .csv file in ComfyUI's input/ folder (press R to refresh the "
+                        'list). JSON: {"series": {name: {"unit", "range", "times_ms", "values"}}, '
+                        '"matrices": {name: {"columns", "units", "times_ms", "frames"}}, "length_ms"}. '
+                        "CSV: a time column (time_ms, or time_s for seconds), then one column per "
+                        "series with optional [unit] in the header; if times repeat, the file is "
+                        "one frame matrix (e.g. partials) named after the file."
+                    ),
+                ),
+            ],
+            outputs=[m5Descriptor.Output("descriptor")],
+        )
+
+    @classmethod
+    def execute(cls, file: str) -> io.NodeOutput:
+        return io.NodeOutput(m5.Descriptor.from_file(folder_paths.get_annotated_filepath(file)))
+
+    @classmethod
+    def fingerprint_inputs(cls, file: str) -> str:
+        # Re-run when the file's contents change, not only when another file is picked.
+        with open(folder_paths.get_annotated_filepath(file), "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()
+
+    @classmethod
+    def validate_inputs(cls, file: str) -> bool | str:
+        if not folder_paths.exists_annotated_filepath(file):
+            return f"Descriptor file not found in input/: {file}"
         return True

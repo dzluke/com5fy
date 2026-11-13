@@ -29,6 +29,9 @@ NODE_IDS = {
     "m5_LoadBPF",
     "m5_BPFResample",
     "m5_BPFRescale",
+    "m5_LoadDescriptor",
+    "m5_DescriptorToSequence",
+    "m5_DescriptorToBPF",
 }
 
 

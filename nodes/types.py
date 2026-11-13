@@ -26,3 +26,12 @@ class m5BPF(io.ComfyTypeIO):
     interpolation + range) passed between m5 nodes. Drawn in (and shown by) the BPF node;
     produced by LoadBPF, BPFRescale, BPFResample."""
     Type = Any
+
+
+@io.comfytype(io_type="M5_DESCRIPTOR")
+class m5Descriptor(io.ComfyTypeIO):
+    """An m5.Descriptor (named analysis tracks over time: time series such as f0 or loudness
+    with units and ranges, and frame matrices such as partials) passed between m5 nodes.
+    Produced by LoadDescriptor; consumed by DescriptorToSequence and DescriptorToBPF; shown as
+    text by ComfyUI's Preview as Text until the Descriptor viewer (M3.5)."""
+    Type = Any

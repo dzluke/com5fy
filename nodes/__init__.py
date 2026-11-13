@@ -1,6 +1,6 @@
 """The m5 ComfyUI nodes, grouped by module:
 
-- ``types``: the custom ComfyUI types (M5_SCORE, M5_SEQUENCE, M5_BPF)
+- ``types``: the custom ComfyUI types (M5_SCORE, M5_SEQUENCE, M5_BPF, M5_DESCRIPTOR)
 - ``boundary``: ComfyUI AUDIO ⇄ m5.Audio conversion, the only code that touches torch
 - ``convert``: nodes that convert between representations
 - ``create``: nodes that make data from what is entered in the node (the BPF curve editor)
@@ -17,6 +17,9 @@ from .create import BPFNode
 from .edit import BPFRescale, BPFResample
 from .io import LoadBPF, LoadScore
 from .types import m5BPF, m5Score, m5Sequence
+from .convert import DescriptorToBPF, DescriptorToSequence
+from .io import LoadDescriptor
+from .types import m5Descriptor
 
 # Imported after the submodules on purpose: importing ``.io`` binds the name ``io`` in
 # this package to that submodule, so ComfyUI's ``io`` must be bound afterwards.
@@ -43,6 +46,9 @@ class m5Extension(ComfyExtension):
             LoadBPF,
             BPFResample,
             BPFRescale,
+            LoadDescriptor,
+            DescriptorToSequence,
+            DescriptorToBPF,
         ]
 
 
@@ -67,6 +73,10 @@ __all__ = [
     "LoadBPF",
     "BPFResample",
     "BPFRescale",
+    "m5Descriptor",
+    "LoadDescriptor",
+    "DescriptorToSequence",
+    "DescriptorToBPF",
     "m5Extension",
     "comfy_entrypoint",
 ]

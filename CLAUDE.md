@@ -20,7 +20,7 @@ milestone first; tick the task and add a §9 session-log line when done. Project
 - Node ids are `m5_<Name>` (e.g. `m5_ScoreViewer`); never rename an existing id (it breaks saved workflows).
   Plan §3 wants categories under `m5/…` (`m5/convert`, `m5/edit`, `m5/io`…); the older nodes still use
   `audio` / `music`; new nodes use `m5/…` (Score/Sequence conversions are in `m5/convert`).
-- Custom types: `@io.comfytype(io_type="M5_…")` on an `io.ComfyTypeIO` subclass (`M5_SCORE`, `M5_SEQUENCE`, `M5_BPF` so far),
+- Custom types: `@io.comfytype(io_type="M5_…")` on an `io.ComfyTypeIO` subclass (`M5_SCORE`, `M5_SEQUENCE`, `M5_BPF`, `M5_DESCRIPTOR` so far),
   carrying the m5 object as-is.
 - Audio crosses node boundaries as ComfyUI's builtin `AUDIO` (`{"waveform": torch (B, C, T), "sample_rate"}`) so it
   connects to Load/Save Audio. Convert only with `_to_m5_audio` / `_to_comfy_audio` in `nodes/boundary.py` — the only places

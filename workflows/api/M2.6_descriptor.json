@@ -1,0 +1,76 @@
+{
+ "m5": {
+  "description": "M2.6: Load Descriptor (JSON from input/) -> Preview as Text; -> Descriptor to Sequence -> Sequence Viewer; -> Descriptor to BPF (f0) -> BPF node (read-only view).",
+  "markers": [],
+  "expect_outputs": [
+   "2",
+   "4",
+   "6"
+  ]
+ },
+ "1": {
+  "class_type": "m5_LoadDescriptor",
+  "inputs": {
+   "file": "m5_melody.desc.json"
+  }
+ },
+ "2": {
+  "class_type": "PreviewAny",
+  "inputs": {
+   "source": [
+    "1",
+    0
+   ]
+  }
+ },
+ "3": {
+  "class_type": "m5_DescriptorToSequence",
+  "inputs": {
+   "descriptor": [
+    "1",
+    0
+   ],
+   "onsets": "onsets",
+   "pitch": "f0",
+   "partials": "partials",
+   "min_partial_ms": 0.0
+  }
+ },
+ "4": {
+  "class_type": "m5_SequenceViewer",
+  "inputs": {
+   "sequence": [
+    "3",
+    0
+   ],
+   "zoom": 1.0
+  }
+ },
+ "5": {
+  "class_type": "m5_DescriptorToBPF",
+  "inputs": {
+   "descriptor": [
+    "1",
+    0
+   ],
+   "name": "f0",
+   "interpolation": "exp"
+  }
+ },
+ "6": {
+  "class_type": "m5_BPF",
+  "inputs": {
+   "input": [
+    "5",
+    0
+   ],
+   "points": "[[0,0],[4000,1]]",
+   "duration_ms": 4000.0,
+   "min": 0.0,
+   "max": 1.0,
+   "interpolation": "linear",
+   "name": "",
+   "unit": ""
+  }
+ }
+}

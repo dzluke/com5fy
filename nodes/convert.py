@@ -6,7 +6,7 @@ import m5
 
 from . import paths
 from .boundary import _to_comfy_audio, _to_m5_audio
-from .types import m5Score, m5Sequence
+from .types import m5BPF, m5Descriptor, m5Score, m5Sequence
 
 
 # Shown in the database dropdown when no database is installed, so the workflow
@@ -419,3 +419,111 @@ class SequenceToScore(io.ComfyNode):
     def execute(cls, sequence, quantization: str, bpm: float) -> io.NodeOutput:
         grid = None if quantization == "none" else quantization
         return io.NodeOutput(m5.Score.from_sequence(sequence, quantization=grid, bpm=bpm or None))
+
+
+def _descriptor_name(text: str) -> str | None:
+    """A descriptor-name widget: blank (or spaces) means "not used"."""
+    return text.strip() or None
+
+
+class DescriptorToSequence(io.ComfyNode):
+    """Turn a Descriptor's onsets and/or partials into events (``Descriptor.to_sequence``),
+    the Descriptor → Sequence step of the conversion hub (plan §2.3)."""
+
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="m5_DescriptorToSequence",
+            display_name="Descriptor to Sequence",
+            category="m5/convert",
+            description=(
+                "Turns analysis data into notes. Onsets: one note per onset, lasting until "
+                "the next, pitched at the median of the pitch track over that span (nearest "
+                "pitch + cents). Partials: one note per partial, at its mean frequency. Each "
+                "source becomes its own staff, named after the descriptor. Other tracks' "
+                "mean values are kept on the notes as custom fields."
+            ),
+            inputs=[
+                m5Descriptor.Input("descriptor"),
+                io.String.Input(
+                    "onsets",
+                    default="onsets",
+                    tooltip=(
+                        "Name of the time series whose times are note starts (its values "
+                        "aren't used). Blank = no onset notes."
+                    ),
+                ),
+                io.String.Input(
+                    "pitch",
+                    default="f0",
+                    tooltip=(
+                        "Name of the time series that pitches the onset notes, in Hz, MIDI or "
+                        "midicents (read from its unit). Blank = unpitched onset notes."
+                    ),
+                ),
+                io.String.Input(
+                    "partials",
+                    default="partials",
+                    tooltip=(
+                        "Name of the frame matrix of partials (columns frequency, optionally "
+                        "amplitude and index: rows with the same index are one partial). "
+                        "Blank = no partial notes."
+                    ),
+                ),
+                io.Float.Input(
+                    "min_partial_ms",
+                    default=0.0,
+                    min=0.0,
+                    max=60000.0,
+                    step=10.0,
+                    tooltip="Drop partials shorter than this (ms). 0 keeps them all.",
+                ),
+            ],
+            outputs=[m5Sequence.Output("sequence")],
+        )
+
+    @classmethod
+    def execute(cls, descriptor, onsets: str, pitch: str, partials: str,
+                min_partial_ms: float = 0.0) -> io.NodeOutput:
+        return io.NodeOutput(descriptor.to_sequence(
+            onsets=_descriptor_name(onsets),
+            pitch=_descriptor_name(pitch),
+            partials=_descriptor_name(partials),
+            min_partial_ms=min_partial_ms,
+        ))
+
+
+class DescriptorToBPF(io.ComfyNode):
+    """Pick one of a Descriptor's time series as a BPF (``Descriptor.to_bpf``): a descriptor
+    used as control data (spec: Descriptor → Control data)."""
+
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="m5_DescriptorToBPF",
+            display_name="Descriptor to BPF",
+            category="m5/convert",
+            description=(
+                "One time series of a descriptor as a break-point function, keeping its "
+                "name, unit and range. Missing values (e.g. unvoiced f0) are skipped, so the "
+                "curve holds across them."
+            ),
+            inputs=[
+                m5Descriptor.Input("descriptor"),
+                io.String.Input("name", default="f0", tooltip="Name of the time series to take."),
+                io.Combo.Input(
+                    "interpolation",
+                    options=list(m5.INTERPOLATIONS),
+                    default="linear",
+                    tooltip=(
+                        "How the BPF moves between points: step (hold), linear, or exp "
+                        "(geometric, for frequencies and amplitudes)."
+                    ),
+                ),
+            ],
+            outputs=[m5BPF.Output("bpf")],
+        )
+
+    @classmethod
+    def execute(cls, descriptor, name: str, interpolation: str = "linear") -> io.NodeOutput:
+        return io.NodeOutput(descriptor.to_bpf(name.strip(), interpolation=interpolation))
