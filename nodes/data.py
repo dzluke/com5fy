@@ -1,4 +1,4 @@
-"""Display nodes: viewers and playback for scores, sequences and audio."""
+"""Display nodes: viewers and playback for scores, sequences, MIDI and audio."""
 
 import contextlib
 import os
@@ -14,7 +14,7 @@ import m5
 import music21
 
 from .boundary import _to_m5_audio
-from .types import m5Score, m5Sequence
+from .types import m5Midi, m5Score, m5Sequence
 
 
 @contextlib.contextmanager
@@ -311,3 +311,122 @@ class AudioPlayback(io.ComfyNode):
         preview = _write_preview_audio(_to_m5_audio(audio))
         return io.NodeOutput(audio, ui={"playback_audio": [preview]})
 
+
+
+# Most barlines the MIDI Viewer draws: a long file still gets a grid, but a broken time map
+# (say 1000 BPM) can't produce a huge payload.
+MAX_BARS = 4000
+
+
+def _midi_grid(midi) -> tuple[list[dict], list[float]]:
+    """Barlines ``{ms, measure}`` and beat times (ms, without the barlines) of ``midi``'s time
+    map, from 0 to the end of the file. A pickup measure starts at 0 with its own number."""
+    tm, end_ms = midi.time_map, midi.duration
+    bars: list[dict] = []
+    beats: list[float] = []
+    measure = tm.first_measure - (1 if tm.pickup > 0 else 0)
+    while len(bars) < MAX_BARS:
+        start_q = tm.measure_start_quarters(measure)
+        start_ms = tm.quarters_to_ms(max(start_q, 0.0))
+        if start_ms > end_ms + 1e-6 and bars:
+            break
+        bars.append({"ms": start_ms, "measure": measure})
+        meter = tm.meter_at(measure)
+        for beat in range(1, meter.numerator):
+            q = start_q + beat * meter.beat_quarters
+            if q > 1e-9:
+                beats.append(tm.quarters_to_ms(q))
+        measure += 1
+    return bars, beats
+
+
+def _midi_to_payload(midi) -> dict:
+    """Serialize an m5.Midi into the JSON payload the MIDI Viewer's piano roll draws::
+
+        {"tracks": [{"name": str, "channels": [1-based…],
+                     "notes": [[start_ms, duration_ms, pitch, velocity, channel (1-based), cents], …]}],
+         "duration_ms": float, "bars": [{"ms", "measure"}…], "beats": [ms…],
+         "tempo": "♩ = 100" (first tempo), "meter": "3/4" (first meter)}
+
+    Notes are compact lists, not dicts: a piano part easily has thousands. ``cents`` is the
+    pitch bend at the note's start (``Midi.detuning_cents``), so microtones sit between keys.
+    Tracks without notes (controller-only) are kept, so track numbers match MIDI to BPF's.
+    """
+    tracks = []
+    for track in midi.tracks:
+        notes = [
+            [
+                round(n.start_ms, 3),
+                round(n.duration_ms, 3),
+                n.pitch,
+                n.velocity,
+                n.channel + 1,
+                round(midi.detuning_cents(n), 1),
+            ]
+            for n in sorted(track.notes, key=lambda n: (n.start_ms, n.pitch))
+        ]
+        tracks.append({"name": track.name, "channels": [c + 1 for c in track.channels], "notes": notes})
+    bars, beats = _midi_grid(midi)
+    tempo, meter = midi.time_map.tempos[0], midi.time_map.meters[0]
+    return {
+        "tracks": tracks,
+        "duration_ms": midi.duration,
+        "bars": bars,
+        "beats": beats,
+        "tempo": f"\u2669 = {tempo.quarter_bpm:g}",
+        "meter": f"{meter.numerator}/{meter.denominator}",
+    }
+
+
+class MidiViewer(io.ComfyNode):
+    """Show an m5.Midi as a piano roll and play it with m5's basic synth.
+
+    The piano roll is drawn by the frontend from a compact JSON payload (one row per key,
+    tracks in colors, barlines from the file's time map); playback is a FLAC of
+    ``m5.synthesize_midi`` in ComfyUI's temp folder, like Audio Playback's. The MIDI passes
+    through unchanged.
+    """
+
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="m5_MidiViewer",
+            display_name="MIDI Viewer",
+            category="m5/data",
+            description=(
+                "Piano roll of the MIDI: one row per key, one color per track, barlines and "
+                "measure numbers from the file's tempo and meter, notes fainter when softer; "
+                "microtones (pitch bend at a note's start) sit between rows. Hover a note for "
+                "its pitch, velocity, channel and timing. Play listens through a basic synth "
+                "(a soft additive tone; channel 10 drums are noise hits) that follows velocity, "
+                "pitch bend and the sustain pedal. Click or drag on the roll to move the playhead."
+            ),
+            inputs=[
+                m5Midi.Input("midi"),
+                io.Float.Input(
+                    "zoom",
+                    default=1.0,
+                    min=0.1,
+                    max=50.0,
+                    step=0.1,
+                    round=0.01,
+                    tooltip=(
+                        "Horizontal zoom: 1 fits the whole file into the node's width, 2 shows "
+                        "half of it at a time, and so on (scroll sideways to travel). Changing "
+                        "it redraws right away, without running the workflow."
+                    ),
+                ),
+            ],
+            outputs=[m5Midi.Output("midi")],
+            is_output_node=True,
+        )
+
+    @classmethod
+    def execute(cls, midi, zoom: float = 1.0) -> io.NodeOutput:
+        # The frontend reads message.midi_data[0] and message.playback_audio[0].
+        payload = _midi_to_payload(midi)
+        preview = _write_preview_audio(m5.synthesize_midi(midi)) if midi.duration > 0 else None
+        ui = {"midi_data": [payload], "zoom": [zoom]}
+        if preview:
+            ui["playback_audio"] = [preview]
+        return io.NodeOutput(midi, ui=ui)

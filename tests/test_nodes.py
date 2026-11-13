@@ -37,6 +37,8 @@ NODE_IDS = {
     "m5_MidiToSequence",
     "m5_SequenceToMidi",
     "m5_MidiToBPF",
+    "m5_MidiViewer",
+    "m5_MidiToAudio",
 }
 
 

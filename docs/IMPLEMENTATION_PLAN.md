@@ -107,6 +107,8 @@ Frontend: edit `ui/src/`, then `cd ui && npm ci && npm run build` (reproducible)
 | `m5_LoadMidi` / `m5_SaveMidi` | `.mid` from `input/` → MIDI / MIDI → numbered `.mid` in `output/` (M2.4) |
 | `m5_MidiToSequence` / `m5_SequenceToMidi` | MIDI ⇄ Sequence (tracks = staves, pitch bend = microtones, tempo map kept) (M2.4) |
 | `m5_MidiToBPF`        | one CC lane (or the pitch bend lane, in cents) → BPF (M2.4) |
+| `m5_MidiViewer`       | piano roll of a MIDI (tracks in colors, bars from its time map, microtones between rows, hover) + playback through the basic synth; passes the MIDI on (M3.4) |
+| `m5_MidiToAudio`      | MIDI → AUDIO with `m5.synthesize_midi`, the basic synth (M3.4) |
 
 Nodes use the new `comfy_api.latest.io` schema API (`io.ComfyNode`, `define_schema`, `ComfyExtension`).
 Audio crosses the node boundary as ComfyUI's builtin `AUDIO` (`{"waveform": torch (B, C, T), "sample_rate"}`),
@@ -206,8 +208,13 @@ p 49, mf 80, f 96…) › 80; time map = the Sequence's › 120 BPM 4/4. Track *
 detuning, `_allocate_channels` places notes in time order: home channel if bent right or silent (re-bent), else a spare
 channel (no track's home) bent right or silent, else any, else the nearest bend, so differently detuned notes never
 share a sounding channel. `lanes()` lists `(track, channel, controller)`; `cc_to_bpf(cc | PITCH_BEND, channel, track)`
-gives a **step** BPF (range 0–127, name "CC1 modulation"; pitch bend in cents, range ±`bend_range`). Until the MIDI
-viewer (M3.4), `str(Midi)` (Preview as Text) lists tracks, channels, note counts and lanes.
+gives a **step** BPF (range 0–127, name "CC1 modulation"; pitch bend in cents, range ±`bend_range`). `str(Midi)` (Preview as Text)
+lists tracks, channels, note counts and lanes; the MIDI Viewer (M3.4) draws it as a piano roll.
+**Basic synth (M3.4).** `m5.synthesize_midi(midi) -> Audio` (`synth.py`, numpy only): a listening aid, mono, one
+soft additive tone (5 harmonics, ADSR) for every program; velocity² → loudness; pitch bend followed while a note sounds
+(phase-accumulated, so glides don't click); sustain pedal (CC64) holds released notes until pedal up; channel 10 =
+short noise hits; normalized to 0.99 only if voices clip. Programs, volume/expression and other CCs are ignored. It
+answers §8 item 5 only for MIDI playback; Score → audio (M4.7) is still open.
 Nodes: `m5_LoadMidi`, `m5_SaveMidi` (`m5/io`, numbered `<prefix>_00001_.mid` in `output/` like Save Audio, outputs the
 path), `m5_MidiToSequence`, `m5_SequenceToMidi` (`bend_range` advanced), `m5_MidiToBPF` (lane CC/pitch bend, cc,
 channel 0 = any, track −1 = any) in `m5/convert`. Score ⇄ MIDI goes through Sequence (direct nodes: M4.1).
@@ -481,12 +488,15 @@ Spec: data nodes display only (no editing); each keeps a history of versions you
   *Depends on:* M3.1.
 - [ ] **M3.3 Score node.** Merge viewer behavior: metered via OSMD (exists), proportional via the sequence viewer;
   playback button using `render_sequence` or a simple synth. *Depends on:* M2.3, M3.2.
-- [ ] **M3.4 MIDI node.** Piano-roll viewer (canvas) + playback via a basic synth. *Depends on:* M2.4.
+- [x] **M3.4 MIDI node.** Piano-roll viewer (canvas) + playback via a basic synth. *Depends on:* M2.4.
+  Done as `m5_MidiViewer` (`m5/data`; React/canvas piano roll, `zoom` 1 = whole file, live) + `m5.synthesize_midi`
+  and `m5_MidiToAudio`. History comes with M3.1/M3.2 like the other data nodes.
 - [ ] **M3.5 Descriptor node.** Table view + line plot per descriptor (spec says table; plot is cheap to add).
   *Depends on:* M2.6.
 - [ ] **M3.6 Control-data nodes.** Text (builtin is fine), Number (builtin), BPF node with a curve display. *Depends on:* M2.5.
   The BPF node with its curve editor (draw + display) was done in M2.5; what is left here is history (M3.1).
 - [ ] **M3.7 Audio node.** Fold `m5_AudioPlayback` into the shared history mechanism. *Depends on:* M3.2.
+  Skipped on 2026-11-13 (user): M3.1/M3.2 (and M2.7/M2.8 under them) come first.
 
 ### M4 — Symbolic conversions and analysis (W3 groundwork)
 
@@ -765,3 +775,12 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
 - 2026-11-13 · M2.4 feedback, M2.3 · MIDI notes spelled with sharps only; unnamed MIDI tracks stay unnamed (no GM
   instrument names). M2.3 closed by decision: proportional scores are Sequences shown in the Sequence Viewer, no
   `notation` mode on Score (§8 item 7 answered). · Next: M2.7.
+- 2026-11-13 · M3.4 (M3.7 skipped) · m5: `synthesize_midi` (new `synth.py`: additive tone, velocity, pitch bend
+  followed, sustain pedal, channel 10 noise hits), `Midi.detuning_cents(note)`, 7 tests. com5fy: `m5_MidiViewer`
+  (`m5/data`: React/canvas piano roll in `ui/src/midi/`: rows per key with keyboard, track colors + legend, velocity
+  as opacity, bent notes between rows, barlines/measure numbers/beats from the TimeMap, hover tooltip, play/pause,
+  click/drag to seek, live `zoom` with sideways scroll and follow), `m5_MidiToAudio`; workflow `M3.4_midi_viewer` (UI +
+  API, checked in the browser). Fixed: Audio Playback's click-to-seek did nothing (a native `stopPropagation` on the
+  widget root kept React 18's root listener from seeing `pointerdown`; now a React handler). M3.7 skipped by the user
+  (needs M3.1/M3.2, which need M2.7/M2.8). · Open: user feedback (change note); no vertical zoom/scroll in the roll
+  (the pitch range always fits the height); synth ignores programs and CC7/CC11. Next: M2.7.

@@ -32,6 +32,8 @@ from .nodes import (
     MidiToSequence,
     SequenceToMidi,
     MidiToBPF,
+    MidiViewer,
+    MidiToAudio,
     m5Extension,
     comfy_entrypoint,
 )
@@ -63,6 +65,8 @@ __all__ = [
     "MidiToSequence",
     "SequenceToMidi",
     "MidiToBPF",
+    "MidiViewer",
+    "MidiToAudio",
     "m5Extension",
     "comfy_entrypoint",
 ]

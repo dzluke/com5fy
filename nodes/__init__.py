@@ -20,7 +20,8 @@ from .types import m5BPF, m5Score, m5Sequence
 from .convert import DescriptorToBPF, DescriptorToSequence
 from .io import LoadDescriptor
 from .types import m5Descriptor
-from .convert import MidiToBPF, MidiToSequence, SequenceToMidi
+from .convert import MidiToAudio, MidiToBPF, MidiToSequence, SequenceToMidi
+from .data import MidiViewer
 from .io import LoadMidi, SaveMidi
 from .types import m5Midi
 
@@ -57,6 +58,8 @@ class m5Extension(ComfyExtension):
             MidiToSequence,
             SequenceToMidi,
             MidiToBPF,
+            MidiViewer,
+            MidiToAudio,
         ]
 
 
@@ -91,6 +94,8 @@ __all__ = [
     "MidiToSequence",
     "SequenceToMidi",
     "MidiToBPF",
+    "MidiViewer",
+    "MidiToAudio",
     "m5Extension",
     "comfy_entrypoint",
 ]

@@ -554,6 +554,42 @@ class MidiToSequence(io.ComfyNode):
         return io.NodeOutput(midi.to_sequence())
 
 
+class MidiToAudio(io.ComfyNode):
+    """Play an m5.Midi through m5's basic synth (``m5.synthesize_midi``): a listening aid until
+    real instruments (samples, soundfonts, AFTER) come in later milestones."""
+
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="m5_MidiToAudio",
+            display_name="MIDI to Audio (basic synth)",
+            category="m5/convert",
+            description=(
+                "Renders the MIDI with a simple additive synth: every instrument is the same soft "
+                "tone, channel 10 drums are noise hits. It follows note timing, velocity, pitch "
+                "bend (microtones, glides) and the sustain pedal; programs and other controllers "
+                "are ignored. Mono."
+            ),
+            inputs=[
+                m5Midi.Input("midi"),
+                io.Int.Input(
+                    "sample_rate",
+                    default=44100,
+                    min=8000,
+                    max=96000,
+                    step=100,
+                    advanced=True,
+                    tooltip="Sample rate of the rendered audio, in Hz.",
+                ),
+            ],
+            outputs=[io.Audio.Output("audio")],
+        )
+
+    @classmethod
+    def execute(cls, midi, sample_rate: int = 44100) -> io.NodeOutput:
+        return io.NodeOutput(_to_comfy_audio(m5.synthesize_midi(midi, sample_rate=sample_rate)))
+
+
 class SequenceToMidi(io.ComfyNode):
     """A Sequence as an m5.Midi (``Midi.from_sequence``), the Sequence → MIDI step of the hub."""
 

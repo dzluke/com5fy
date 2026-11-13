@@ -31,10 +31,10 @@ export const COLORS = {
   text: "#9a9a9a",
 };
 
-// One AudioContext shared by every Audio Playback node. Created lazily, since
+// One AudioContext shared by every Audio Playback and MIDI Viewer node. Created lazily, since
 // browsers only allow audio to start after a user gesture.
 let audioContext: AudioContext | null = null;
-function getAudioContext(): AudioContext {
+export function getAudioContext(): AudioContext {
   audioContext ??= new AudioContext();
   return audioContext;
 }

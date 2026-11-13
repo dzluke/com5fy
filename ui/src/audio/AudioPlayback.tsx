@@ -4,7 +4,7 @@
 // its execute(): a FLAC rendering of its input audio, written to ComfyUI's temp
 // directory. Player.ts does the loading, transport and canvas drawing; this
 // component lays out the canvas and the controls row.
-import { type CSSProperties, useEffect, useLayoutEffect, useRef, useSyncExternalStore } from "react";
+import { type CSSProperties, useLayoutEffect, useRef, useSyncExternalStore } from "react";
 
 import { COLORS, type Player } from "./Player";
 
@@ -93,17 +93,13 @@ export function AudioPlayback({ player }: { player: Player }) {
   }, [player]);
 
   // Keep pointer interaction inside the widget from also dragging the node or
-  // panning the canvas. Native listener, so it stops the event at this element.
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-    const stop = (e: PointerEvent) => e.stopPropagation();
-    root.addEventListener("pointerdown", stop);
-    return () => root.removeEventListener("pointerdown", stop);
-  }, []);
-
+  // panning the canvas. A React handler, not a native listener on this div:
+  // React 18 listens at the root container (the widget host), so a native
+  // stopPropagation here would also keep the canvas's own React handlers
+  // (seek, scrub) from ever running. React's stopPropagation stops the native
+  // event at the host, before ComfyUI's listeners further up.
   return (
-    <div ref={rootRef} style={rootStyle}>
+    <div ref={rootRef} style={rootStyle} onPointerDown={(e) => e.stopPropagation()}>
       <div ref={wrapRef} style={canvasWrapStyle}>
         <canvas
           ref={canvasRef}

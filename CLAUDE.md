@@ -13,7 +13,7 @@ milestone first; tick the task and add a §9 session-log line when done. Project
   and the classmethod `execute(...)` → `io.NodeOutput(...)`. Add the class to `m5Extension.get_node_list()`
   in `nodes/__init__.py` and export it from both `nodes/__init__.py` and the top-level `__init__.py`.
 - Where things go: `nodes/types.py` (custom types), `nodes/boundary.py` (ComfyUI ⇄ m5 conversions),
-  `nodes/convert.py` (conversion nodes), `nodes/data.py` (viewers, playback), `nodes/io.py` (file load/save),
+  `nodes/convert.py` (conversion nodes), `nodes/data.py` (viewers, playback, MIDI Viewer), `nodes/io.py` (file load/save),
   `nodes/paths.py` (`folder_paths` registration of `models/m5/*`, e.g. `orchidea_db`).
   New groups (e.g. `edit.py`) get their own module. In `nodes/__init__.py`, ComfyUI's `io` is imported *after* the
   submodules, because importing `.io` rebinds the name `io` in the package.
@@ -38,11 +38,14 @@ milestone first; tick the task and add a §9 session-log line when done. Project
 - ComfyUI imports **every `*.js`** under `WEB_DIRECTORY = "./js"`, so the build emits exactly one: `js/com5fy.js`
   (React + all three viewers). OSMD and VexFlow are lazy chunks `js/chunks/*.mjs` (`.mjs` so ComfyUI doesn't import
   them at startup), loaded on first render. Don't add other `.js` outputs.
-- Layout: `ui/src/main.ts` imports one `register.tsx` per viewer (`score/`, `sequence/`, `audio/`, `bpf/` = the BPF node's curve editor); each does one
+- Layout: `ui/src/main.ts` imports one `register.tsx` per viewer (`score/`, `sequence/`, `audio/`, `bpf/` = the BPF node's curve editor, `midi/` = the MIDI Viewer's piano roll); each does one
   `app.registerExtension`, mounts a React root into the node's DOM widget (`common/node.ts`: `chainCallback`,
   `fitNodeHeight`, the `M5Node` subset of LGraphNode we use), and unmounts it in `onRemoved`. OSMD/VexFlow draw
   imperatively into a childless React element (`common/ScrollPane.tsx`); the audio player's state/drawing lives in
   `audio/Player.ts`, its controls in `audio/AudioPlayback.tsx`.
+- To keep clicks in a widget from dragging the node, stop `pointerdown` with a **React** handler on the widget's root
+  (`onPointerDown={(e) => e.stopPropagation()}`), never a native listener inside the React root: React 18 listens at
+  the root container, so a native stop below it silently disables every React `onPointer…` handler in the widget.
 - `/scripts/app.js` and `/scripts/api.js` are external (served by ComfyUI); `tsconfig.json` `paths` maps them to the
   type stubs in `ui/src/types/`.
 

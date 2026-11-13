@@ -1,0 +1,81 @@
+{
+ "m5": {
+  "description": "M3.4: Load MIDI -> MIDI Viewer -> MIDI to Audio -> Audio Playback; duo score -> Sequence -> MIDI -> MIDI Viewer.",
+  "markers": [],
+  "expect_outputs": [
+   "2",
+   "4",
+   "8"
+  ]
+ },
+ "1": {
+  "class_type": "m5_LoadMidi",
+  "inputs": {
+   "file": "m5_duo_cc.mid"
+  }
+ },
+ "2": {
+  "class_type": "m5_MidiViewer",
+  "inputs": {
+   "zoom": 1.0,
+   "midi": [
+    "1",
+    0
+   ]
+  }
+ },
+ "3": {
+  "class_type": "m5_MidiToAudio",
+  "inputs": {
+   "sample_rate": 44100,
+   "midi": [
+    "2",
+    0
+   ]
+  }
+ },
+ "4": {
+  "class_type": "m5_AudioPlayback",
+  "inputs": {
+   "audio": [
+    "3",
+    0
+   ]
+  }
+ },
+ "5": {
+  "class_type": "m5_LoadScore",
+  "inputs": {
+   "path": "custom_nodes/com5fy/tests/data/duo_tempo_dynamics.musicxml"
+  }
+ },
+ "6": {
+  "class_type": "m5_ScoreToSequence",
+  "inputs": {
+   "score": [
+    "5",
+    0
+   ]
+  }
+ },
+ "7": {
+  "class_type": "m5_SequenceToMidi",
+  "inputs": {
+   "bend_range": 2.0,
+   "sequence": [
+    "6",
+    0
+   ]
+  }
+ },
+ "8": {
+  "class_type": "m5_MidiViewer",
+  "inputs": {
+   "zoom": 1.0,
+   "midi": [
+    "7",
+    0
+   ]
+  }
+ }
+}

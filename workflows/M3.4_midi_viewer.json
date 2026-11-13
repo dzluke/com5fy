@@ -1,0 +1,447 @@
+{
+ "id": "5f6b1c1e-0a1b-4c4e-9d1a-31a4e0000034",
+ "revision": 0,
+ "last_node_id": 9,
+ "last_link_id": 6,
+ "nodes": [
+  {
+   "id": 1,
+   "type": "m5_LoadMidi",
+   "pos": [
+    60,
+    80
+   ],
+   "size": [
+    320,
+    60
+   ],
+   "flags": {},
+   "order": 0,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "file",
+     "name": "file",
+     "type": "COMBO",
+     "widget": {
+      "name": "file"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "midi",
+     "name": "midi",
+     "type": "M5_MIDI",
+     "links": [
+      1,
+      2
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "m5_LoadMidi"
+   },
+   "widgets_values": [
+    "m5_duo_cc.mid"
+   ]
+  },
+  {
+   "id": 2,
+   "type": "m5_MidiViewer",
+   "pos": [
+    420,
+    80
+   ],
+   "size": [
+    900,
+    420
+   ],
+   "flags": {},
+   "order": 1,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "midi",
+     "name": "midi",
+     "type": "M5_MIDI",
+     "link": 1
+    },
+    {
+     "localized_name": "zoom",
+     "name": "zoom",
+     "type": "FLOAT",
+     "widget": {
+      "name": "zoom"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "midi",
+     "name": "midi",
+     "type": "M5_MIDI",
+     "links": null
+    }
+   ],
+   "title": "MIDI Viewer: duo_cc.mid",
+   "properties": {
+    "Node name for S&R": "m5_MidiViewer"
+   },
+   "widgets_values": [
+    1.0,
+    ""
+   ]
+  },
+  {
+   "id": 3,
+   "type": "m5_MidiToAudio",
+   "pos": [
+    60,
+    560
+   ],
+   "size": [
+    320,
+    60
+   ],
+   "flags": {},
+   "order": 2,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "midi",
+     "name": "midi",
+     "type": "M5_MIDI",
+     "link": 2
+    },
+    {
+     "localized_name": "sample_rate",
+     "name": "sample_rate",
+     "type": "INT",
+     "widget": {
+      "name": "sample_rate"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "audio",
+     "name": "audio",
+     "type": "AUDIO",
+     "links": [
+      3
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "m5_MidiToAudio"
+   },
+   "widgets_values": [
+    44100
+   ]
+  },
+  {
+   "id": 4,
+   "type": "m5_AudioPlayback",
+   "pos": [
+    420,
+    560
+   ],
+   "size": [
+    900,
+    240
+   ],
+   "flags": {},
+   "order": 3,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "audio",
+     "name": "audio",
+     "type": "AUDIO",
+     "link": 3
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "audio",
+     "name": "audio",
+     "type": "AUDIO",
+     "links": null
+    }
+   ],
+   "title": "Basic synth rendering",
+   "properties": {
+    "Node name for S&R": "m5_AudioPlayback"
+   },
+   "widgets_values": [
+    ""
+   ]
+  },
+  {
+   "id": 5,
+   "type": "m5_LoadScore",
+   "pos": [
+    60,
+    860
+   ],
+   "size": [
+    400,
+    80
+   ],
+   "flags": {},
+   "order": 4,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "path",
+     "name": "path",
+     "type": "STRING",
+     "widget": {
+      "name": "path"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "score",
+     "name": "score",
+     "type": "M5_SCORE",
+     "links": [
+      4
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "m5_LoadScore"
+   },
+   "widgets_values": [
+    "custom_nodes/com5fy/tests/data/duo_tempo_dynamics.musicxml"
+   ]
+  },
+  {
+   "id": 6,
+   "type": "m5_ScoreToSequence",
+   "pos": [
+    60,
+    980
+   ],
+   "size": [
+    260,
+    50
+   ],
+   "flags": {},
+   "order": 5,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "score",
+     "name": "score",
+     "type": "M5_SCORE",
+     "link": 4
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "sequence",
+     "name": "sequence",
+     "type": "M5_SEQUENCE",
+     "links": [
+      5
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "m5_ScoreToSequence"
+   },
+   "widgets_values": []
+  },
+  {
+   "id": 7,
+   "type": "m5_SequenceToMidi",
+   "pos": [
+    60,
+    1080
+   ],
+   "size": [
+    260,
+    60
+   ],
+   "flags": {},
+   "order": 6,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "sequence",
+     "name": "sequence",
+     "type": "M5_SEQUENCE",
+     "link": 5
+    },
+    {
+     "localized_name": "bend_range",
+     "name": "bend_range",
+     "type": "FLOAT",
+     "widget": {
+      "name": "bend_range"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "midi",
+     "name": "midi",
+     "type": "M5_MIDI",
+     "links": [
+      6
+     ]
+    }
+   ],
+   "properties": {
+    "Node name for S&R": "m5_SequenceToMidi"
+   },
+   "widgets_values": [
+    2.0
+   ]
+  },
+  {
+   "id": 8,
+   "type": "m5_MidiViewer",
+   "pos": [
+    420,
+    860
+   ],
+   "size": [
+    900,
+    380
+   ],
+   "flags": {},
+   "order": 7,
+   "mode": 0,
+   "inputs": [
+    {
+     "localized_name": "midi",
+     "name": "midi",
+     "type": "M5_MIDI",
+     "link": 6
+    },
+    {
+     "localized_name": "zoom",
+     "name": "zoom",
+     "type": "FLOAT",
+     "widget": {
+      "name": "zoom"
+     },
+     "link": null
+    }
+   ],
+   "outputs": [
+    {
+     "localized_name": "midi",
+     "name": "midi",
+     "type": "M5_MIDI",
+     "links": null
+    }
+   ],
+   "title": "MIDI Viewer: duo score as MIDI",
+   "properties": {
+    "Node name for S&R": "m5_MidiViewer"
+   },
+   "widgets_values": [
+    1.0,
+    ""
+   ]
+  },
+  {
+   "id": 9,
+   "type": "Note",
+   "pos": [
+    1360,
+    80
+   ],
+   "size": [
+    460,
+    760
+   ],
+   "flags": {},
+   "order": 8,
+   "mode": 0,
+   "inputs": [],
+   "outputs": [],
+   "properties": {
+    "Node name for S&R": "Note"
+   },
+   "widgets_values": [
+    "M3.4: the MIDI Viewer (piano roll + basic synth).\n\nInput: m5_duo_cc.mid (copied into input/ by the workflow runner; otherwise copy it from custom_nodes/com5fy/workflows/inputs/). Clarinet + piano, 100 BPM in 3/4, 75 BPM from bar 3, 4/4 from bar 4; the clarinet's 4th note (A4) is bent up a quarter tone; the piano holds the sustain pedal in bar 2.\n\nPress Run. Look at:\n1. MIDI Viewer (top): one row per key (keyboard on the left, C's labelled), Clarinet in blue, Piano in orange, barlines with measure numbers 1-4 (bars get longer at bar 3 (slower tempo) and bar 4 (4/4)), faint beat lines. The clarinet's A4 sits half a row above A4 (+50 cents). Softer notes are fainter (piano vel 64 vs clarinet 90).\n2. Hover a note: pitch (+ cents), MIDI number, velocity, track, channel, start and length.\n3. Press play: the basic synth (one soft tone for every track). The playhead moves; sounding notes get a white outline. Click or drag on the roll to jump. Listen for the quarter-tone A4 and the piano chord in bar 2 held by the pedal until bar 3.\n4. zoom: 1 fits the whole file; raise it (e.g. 4) and scroll sideways (wheel / trackpad / scrollbar); the view follows the playhead while playing. It redraws without running again.\n5. MIDI to Audio (basic synth) -> Audio Playback: the same rendering as an AUDIO output (waveform, spectrogram), to save or feed other nodes.\n6. Bottom row: the M2.1 duo score -> Sequence -> MIDI -> MIDI Viewer: flute + clarinet with velocities from the dynamics, and the flute's quarter-flat drawn between rows (it plays on its own channel, bent).\n\nTry: your own .mid files (put them in input/ and press R); a drum track (channel 10 plays noise hits)."
+   ],
+   "color": "#432",
+   "bgcolor": "#653"
+  }
+ ],
+ "links": [
+  [
+   1,
+   1,
+   0,
+   2,
+   0,
+   "M5_MIDI"
+  ],
+  [
+   2,
+   1,
+   0,
+   3,
+   0,
+   "M5_MIDI"
+  ],
+  [
+   3,
+   3,
+   0,
+   4,
+   0,
+   "AUDIO"
+  ],
+  [
+   4,
+   5,
+   0,
+   6,
+   0,
+   "M5_SCORE"
+  ],
+  [
+   5,
+   6,
+   0,
+   7,
+   0,
+   "M5_SEQUENCE"
+  ],
+  [
+   6,
+   7,
+   0,
+   8,
+   0,
+   "M5_MIDI"
+  ]
+ ],
+ "groups": [],
+ "config": {},
+ "extra": {
+  "ds": {
+   "scale": 0.7,
+   "offset": [
+    0,
+    0
+   ]
+  }
+ },
+ "version": 0.4
+}
