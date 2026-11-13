@@ -5,7 +5,7 @@
 // JSON, so they are saved in the workflow (widgets_values) and sent to the backend like any
 // widget. The other widgets (duration_ms, min, max, interpolation, name, unit) set the box
 // and are read at draw time. The editor is the first widget, so it sits above the settings
-// and takes most of the node (~75% at the default size). When the node runs with a BPF on its `input`, the backend sends
+// and takes all the height they leave. When the node runs with a BPF on its `input`, the backend sends
 // it back as ui.bpf and the editor shows it read-only.
 import { flushSync } from "react-dom";
 import { type Root, createRoot } from "react-dom/client";
@@ -38,8 +38,8 @@ type BPFProto = NodePrototype<BPFNode> & {
 };
 
 const SETTINGS = ["duration_ms", "min", "max", "interpolation", "name", "unit"];
-// Default node size: the editor gets ~75% of the height, the six settings the rest.
-const DEFAULT_SIZE = [560, 760];
+// Default node size (the size before the editor moved on top; user, 2026-11-13).
+const DEFAULT_SIZE = [520, 420];
 const LG_INPUT = 1; // LiteGraph NodeSlotType.INPUT
 
 function widget(node: BPFNode, name: string): Widget | undefined {
@@ -77,8 +77,6 @@ function migrateWidgetOrder(node: BPFNode, info?: { widgets_values?: unknown[] }
   });
   const editor = node._m5Bpf?.editor;
   if (editor) editor.points = parsePoints(values[SETTINGS.length]);
-  // Old nodes were 420 high, which leaves the editor small now that it sits on top.
-  node.setSize([Math.max(node.size[0], DEFAULT_SIZE[0]), Math.max(node.size[1], DEFAULT_SIZE[1])]);
 }
 
 /** Grey out the drawing settings while a BPF on `input` is shown instead. */

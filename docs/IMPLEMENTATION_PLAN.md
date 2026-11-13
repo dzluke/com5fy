@@ -170,8 +170,10 @@ its `points` widget (JSON `[[t, v]…]`) is swapped for the editor, so points ar
 backend; `duration_ms`, `min`/`max` (= the BPF's `range`), `interpolation`, `name`, `unit` are widgets. With a BPF on
 its optional `input` it shows that curve read-only and passes it through, so it is also the BPF viewer ("Edit a copy"
 copies it into the editor). This node is the **exception to "data nodes are display-only"** (§7). No Preview as Text.
-Layout (user, 2026-11-13): the editor is the node's first widget, above the settings, and takes ~75% of the default
-560 × 760 node; older workflows (settings first in `widgets_values`) are re-read by name and grown on load.
+Layout (user, 2026-11-13): the editor is the node's first widget, above the settings, and takes the height they
+leave; default node size 520 × 420 (the user asked for this size back after trying 560 × 760), where the editor is
+~31% of the node at its 120 px minimum + status row (the six settings rows take the rest); older workflows (settings
+first in `widgets_values`) are re-read by name on load.
 A curve on `input` is drawn **zoomed to its data** (min..max + 5%), not its nominal `range` (user, 2026-11-13: an f0
 track at 220–390 Hz is unreadable in 50–2000 Hz); "Edit a copy" still copies the nominal range into `min`/`max`.
 
@@ -418,7 +420,7 @@ M13 = release work done along the way.
 - [ ] **M2.4 `Midi` type.** Read/write `.mid`, `from_sequence` / `to_sequence`, tempo map, CC lanes → BPFs.
   *Depends on:* M2.2.
 - [x] **M2.5 `BPF` type.** Points, interpolation (step/linear/exp), resample to a grid, rescale range, read/write JSON/CSV.
-  m5 type, Load BPF / Rescale / Resample and the drawable BPF node (curve editor, on top, ~75% of the node; incoming
+  m5 type, Load BPF / Rescale / Resample and the drawable BPF node (curve editor on top of the settings; incoming
   curves zoomed to their data), §2.2.
 - [x] **M2.6 `Descriptor` type.** Named time series + units + range; frame matrices (e.g. partials: time × (freq, amp));
   `to_bpf(name)`, `to_sequence()` (onsets/partials as events); read/write JSON/CSV and SDIF if a library is available.
@@ -707,3 +709,6 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
   the node (default 560 × 760, old `widgets_values` order migrated on load, workflows M2.5/M2.6 relaid out); an
   incoming curve is drawn zoomed to its data. Checked in the browser. M2.5 and M2.6 ticked. · Open: light theme of the
   editor not looked at; points not stretched when duration/min/max change. Next: M2.3 / M2.4.
+- 2026-11-13 · M2.5 feedback · BPF node back to its 520 × 420 default (no growing of old nodes, editor minimum 120 px
+  again), editor stays on top; workflows M2.5/M2.6 back to their earlier layout. At this size the editor is ~31% of the
+  node. · Open: the user's call on a bigger editor at this size (fewer/compact settings). Next: M2.3 / M2.4.
