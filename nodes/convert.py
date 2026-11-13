@@ -6,7 +6,7 @@ import m5
 
 from . import paths
 from .boundary import _to_comfy_audio, _to_m5_audio
-from .types import m5BPF, m5Descriptor, m5Score, m5Sequence
+from .types import m5BPF, m5Descriptor, m5Midi, m5Score, m5Sequence
 
 
 # Shown in the database dropdown when no database is installed, so the workflow
@@ -527,3 +527,110 @@ class DescriptorToBPF(io.ComfyNode):
     @classmethod
     def execute(cls, descriptor, name: str, interpolation: str = "linear") -> io.NodeOutput:
         return io.NodeOutput(descriptor.to_bpf(name.strip(), interpolation=interpolation))
+
+
+class MidiToSequence(io.ComfyNode):
+    """An m5.Midi as a Sequence (``Midi.to_sequence``), the MIDI → Sequence step of the hub
+    (plan §2.3); with Sequence to Score it turns a MIDI file into notation."""
+
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="m5_MidiToSequence",
+            display_name="MIDI to Sequence",
+            category="m5/convert",
+            description=(
+                "One staff per track (named after the track, or its General MIDI instrument); notes "
+                "that start and end together are one chord. Pitch bends at a note's start become "
+                "microtones (cents). The file's tempo and time signatures go along, so Sequence to "
+                "Score writes the same meters and tempo marks."
+            ),
+            inputs=[m5Midi.Input("midi")],
+            outputs=[m5Sequence.Output("sequence")],
+        )
+
+    @classmethod
+    def execute(cls, midi) -> io.NodeOutput:
+        return io.NodeOutput(midi.to_sequence())
+
+
+class SequenceToMidi(io.ComfyNode):
+    """A Sequence as an m5.Midi (``Midi.from_sequence``), the Sequence → MIDI step of the hub."""
+
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="m5_SequenceToMidi",
+            display_name="Sequence to MIDI",
+            category="m5/convert",
+            description=(
+                "One track per staff (sub-Sequence), named after its instrument. Velocities come "
+                "from the notes, else from the dynamic markings (p = 49, mf = 80, f = 96…), else 80. "
+                "Microtones become pitch bends, with notes spread over channels so that differently "
+                "detuned notes never share one. Keeps the Sequence's tempo map (from a score or a "
+                "MIDI file), else 120 BPM in 4/4; the note times in ms are kept either way."
+            ),
+            inputs=[
+                m5Sequence.Input("sequence"),
+                io.Float.Input(
+                    "bend_range",
+                    default=2.0,
+                    min=0.5,
+                    max=48.0,
+                    step=0.5,
+                    tooltip=(
+                        "Semitones of a full pitch bend, as the synth playing the file is set "
+                        "(2 is the General MIDI default; other values are written into the file "
+                        "with RPN 0)."
+                    ),
+                    advanced=True,
+                ),
+            ],
+            outputs=[m5Midi.Output("midi")],
+        )
+
+    @classmethod
+    def execute(cls, sequence, bend_range: float = 2.0) -> io.NodeOutput:
+        return io.NodeOutput(m5.Midi.from_sequence(sequence, bend_range=bend_range))
+
+
+MIDI_LANES = ("CC", "pitch bend")
+
+
+class MidiToBPF(io.ComfyNode):
+    """One controller lane (or the pitch bend lane) of an m5.Midi as a BPF (``Midi.cc_to_bpf``):
+    MIDI as control data (spec: MIDI → Control data)."""
+
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="m5_MidiToBPF",
+            display_name="MIDI to BPF",
+            category="m5/convert",
+            description=(
+                "A controller (CC) lane, e.g. CC1 modulation, CC7 volume, CC64 sustain, as a step "
+                "break-point function with range 0–127; or the pitch bend lane in cents. Preview "
+                "the MIDI as text to see which lanes the file has."
+            ),
+            inputs=[
+                m5Midi.Input("midi"),
+                io.Combo.Input("lane", options=list(MIDI_LANES), default="CC",
+                               tooltip="A controller lane (number below) or the pitch bend lane."),
+                io.Int.Input("cc", default=1, min=0, max=127,
+                             tooltip="Controller number, for lane = CC (1 modulation, 7 volume, 11 expression, 64 sustain…)."),
+                io.Int.Input("channel", default=0, min=0, max=16,
+                             tooltip="MIDI channel 1–16; 0 = any channel."),
+                io.Int.Input("track", default=-1, min=-1, max=255,
+                             tooltip="Track number as Preview as Text lists them (from 0); -1 = any track."),
+            ],
+            outputs=[m5BPF.Output("bpf")],
+        )
+
+    @classmethod
+    def execute(cls, midi, lane: str = "CC", cc: int = 1, channel: int = 0, track: int = -1) -> io.NodeOutput:
+        controller = m5.PITCH_BEND if lane == "pitch bend" else cc
+        return io.NodeOutput(midi.cc_to_bpf(
+            controller,
+            channel=channel - 1 if channel > 0 else None,
+            track=track if track >= 0 else None,
+        ))

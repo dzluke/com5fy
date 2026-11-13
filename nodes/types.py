@@ -35,3 +35,12 @@ class m5Descriptor(io.ComfyTypeIO):
     Produced by LoadDescriptor; consumed by DescriptorToSequence and DescriptorToBPF; shown as
     text by ComfyUI's Preview as Text until the Descriptor viewer (M3.5)."""
     Type = Any
+
+
+@io.comfytype(io_type="M5_MIDI")
+class m5Midi(io.ComfyTypeIO):
+    """An m5.Midi (tracks of notes, controller lanes and pitch bends, timed in ms, plus the file's
+    tempo/meter map) passed between m5 nodes. Produced by LoadMidi and SequenceToMidi; consumed by
+    MidiToSequence, MidiToBPF and SaveMidi; shown as text by ComfyUI's Preview as Text until the
+    MIDI viewer (M3.4)."""
+    Type = Any

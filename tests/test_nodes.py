@@ -32,6 +32,11 @@ NODE_IDS = {
     "m5_LoadDescriptor",
     "m5_DescriptorToSequence",
     "m5_DescriptorToBPF",
+    "m5_LoadMidi",
+    "m5_SaveMidi",
+    "m5_MidiToSequence",
+    "m5_SequenceToMidi",
+    "m5_MidiToBPF",
 }
 
 

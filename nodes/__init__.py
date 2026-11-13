@@ -1,12 +1,12 @@
 """The m5 ComfyUI nodes, grouped by module:
 
-- ``types``: the custom ComfyUI types (M5_SCORE, M5_SEQUENCE, M5_BPF, M5_DESCRIPTOR)
+- ``types``: the custom ComfyUI types (M5_SCORE, M5_SEQUENCE, M5_BPF, M5_DESCRIPTOR, M5_MIDI)
 - ``boundary``: ComfyUI AUDIO ⇄ m5.Audio conversion, the only code that touches torch
 - ``convert``: nodes that convert between representations
 - ``create``: nodes that make data from what is entered in the node (the BPF curve editor)
 - ``data``: viewers and playback
 - ``edit``: transformations within one type (BPF resample/rescale)
-- ``io``: file loading (and later export)
+- ``io``: file loading and saving (MIDI)
 """
 
 from typing_extensions import override
@@ -20,6 +20,9 @@ from .types import m5BPF, m5Score, m5Sequence
 from .convert import DescriptorToBPF, DescriptorToSequence
 from .io import LoadDescriptor
 from .types import m5Descriptor
+from .convert import MidiToBPF, MidiToSequence, SequenceToMidi
+from .io import LoadMidi, SaveMidi
+from .types import m5Midi
 
 # Imported after the submodules on purpose: importing ``.io`` binds the name ``io`` in
 # this package to that submodule, so ComfyUI's ``io`` must be bound afterwards.
@@ -49,6 +52,11 @@ class m5Extension(ComfyExtension):
             LoadDescriptor,
             DescriptorToSequence,
             DescriptorToBPF,
+            LoadMidi,
+            SaveMidi,
+            MidiToSequence,
+            SequenceToMidi,
+            MidiToBPF,
         ]
 
 
@@ -77,6 +85,12 @@ __all__ = [
     "LoadDescriptor",
     "DescriptorToSequence",
     "DescriptorToBPF",
+    "m5Midi",
+    "LoadMidi",
+    "SaveMidi",
+    "MidiToSequence",
+    "SequenceToMidi",
+    "MidiToBPF",
     "m5Extension",
     "comfy_entrypoint",
 ]

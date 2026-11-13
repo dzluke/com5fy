@@ -67,6 +67,7 @@ ComfyUI/                         upstream ComfyUI checkout (not a git repo here)
 │       ├── audio.py             Audio(waveform: np.ndarray (C, T) float32, sample_rate)
 │       ├── time.py              Event (duration ms + list-valued fields), Sequence ((start_ms, item) list, nestable, optional time_map)
 │       ├── timemap.py           TimeMap: tempo + meter changes, pickup; ms ⇄ quarters ⇄ (measure, beat); from score / MIDI
+│       ├── midi.py              Midi (tracks of notes / CCs / pitch bends in ms + TimeMap), .mid read/write (mido), ⇄ Sequence, CC → BPF
 │       ├── score.py             Score (wraps music21.stream.Score), from_file, from_sequence (quantize), to_sequence, to_musicxml
 │       ├── render.py            render_sequence(Sequence) -> Audio (mixes audio carried by events)
 │       ├── orchidea.py          orchestrate(Audio, params, database) -> Orchestration; SoundDatabase; connection.txt parser
@@ -74,7 +75,7 @@ ComfyUI/                         upstream ComfyUI checkout (not a git repo here)
 │       └── bin/orchestrate      bundled Orchidea binary (universal macOS: arm64 + x86_64)
 └── custom_nodes/com5fy/         git repo — ComfyUI nodes using m5
     ├── docs/IMPLEMENTATION_PLAN.md   this file
-    ├── nodes/                   types.py (M5_SCORE, M5_SEQUENCE), boundary.py, convert.py, data.py, io.py,
+    ├── nodes/                   types.py (M5_SCORE, M5_SEQUENCE, M5_BPF, M5_DESCRIPTOR, M5_MIDI), boundary.py, convert.py, data.py, io.py,
     │                            paths.py (folder_paths: models/m5/orchidea_db)
     ├── tests/                   pytest, calls each node's execute directly; test_workflows.py runs workflows/api
     ├── workflows/               UI-format workflows; api/ (API format) + run.py headless runner; inputs/ fixtures
@@ -103,6 +104,9 @@ Frontend: edit `ui/src/`, then `cd ui && npm ci && npm run build` (reproducible)
 | `m5_LoadDescriptor`   | `.json`/`.csv` from `input/` → Descriptor (M2.6) |
 | `m5_DescriptorToSequence` | onsets (+ pitch track) and/or partials → Sequence (M2.6) |
 | `m5_DescriptorToBPF`  | one descriptor series → BPF (M2.6) |
+| `m5_LoadMidi` / `m5_SaveMidi` | `.mid` from `input/` → MIDI / MIDI → numbered `.mid` in `output/` (M2.4) |
+| `m5_MidiToSequence` / `m5_SequenceToMidi` | MIDI ⇄ Sequence (tracks = staves, pitch bend = microtones, tempo map kept) (M2.4) |
+| `m5_MidiToBPF`        | one CC lane (or the pitch bend lane, in cents) → BPF (M2.4) |
 
 Nodes use the new `comfy_api.latest.io` schema API (`io.ComfyNode`, `define_schema`, `ComfyExtension`).
 Audio crosses the node boundary as ComfyUI's builtin `AUDIO` (`{"waveform": torch (B, C, T), "sample_rate"}`),
@@ -110,7 +114,7 @@ converted by `_to_m5_audio` / `_to_comfy_audio` in `nodes/boundary.py`.
 
 ### What's missing (big picture)
 
-m5 and com5fy have pytest suites (`mmmmm/tests/`, `custom_nodes/com5fy/tests/`). No MIDI, Descriptor, Control-data (Text/Number/BPF) types. No data-node history. No LLM integration.
+m5 and com5fy have pytest suites (`mmmmm/tests/`, `custom_nodes/com5fy/tests/`). No Origin type, no serialization (M2.7, M2.8). No data-node history. No LLM integration.
 No score→audio, no editing nodes, no import/export beyond loading a score file, no Code / Custom nodes,
 no timeline, no model nodes. Orchidea's sound database (TinySOL) is still installed by hand into `models/m5/orchidea_db`.
 
@@ -148,7 +152,7 @@ Rule: if a function would be useful outside ComfyUI, it belongs in `m5`.
 | Event | `m5.Event` | — | exists; carried inside a Sequence |
 | Sequence | `m5.Sequence` | `M5_SEQUENCE` | exists; ms timebase |
 | Score | `m5.Score` | `M5_SCORE` | exists; music21-backed. Needs metered + proportional modes |
-| MIDI | `m5.Midi` | `M5_MIDI` | **todo**; wraps a list of tracks/notes/CCs + tempo map (via `mido` or `pretty_midi`) |
+| MIDI | `m5.Midi` | `M5_MIDI` | exists (M2.4); `MidiTrack`s of notes / CCs / pitch bends / programs in ms + a `TimeMap`, via `mido`, see below |
 | Descriptor | `m5.Descriptor` | `M5_DESCRIPTOR` | exists (M2.6); named `TimeSeries` (times_ms, values, unit, range) + `FrameMatrix` tracks (partials…), see below |
 | Text | `str` | builtin `STRING` | reuse builtin |
 | Number | `float` | builtin `FLOAT`/`INT` | reuse builtin |
@@ -179,6 +183,33 @@ re-read by name on load. (Plain `node.properties` were tried for name/unit: the 
 no Properties entry, so nothing could edit them; advanced inputs are ComfyUI's own mechanism for this.)
 A curve on `input` is drawn **zoomed to its data** (min..max + 5%), not its nominal `range` (user, 2026-11-13: an f0
 track at 220–390 Hz is unreadable in 50–2000 Hz); "Edit a copy" still copies the nominal range into `min`/`max`.
+
+**MIDI details (M2.4).** `m5.Midi(tracks, time_map, ticks_per_quarter=480, bend_range=2.0)` (`midi.py`), read and
+written with **mido** (a base dependency of m5: small, pure Python; music21's MIDI reader is still used by
+`TimeMap.from_midi_file`). A `MidiTrack` holds `MidiNote(start_ms, duration_ms, pitch, velocity, channel)`,
+`ControlChange`, `PitchBend` (−8192…8191) and `ProgramChange` lists, all **in ms**: ticks only exist in the file, through
+the file's tempo/time-signature `TimeMap` (first event at a tick wins across tracks). Channels are 0-based (as in the
+file; 9 = GM drums); nodes show and take them 1-based. Reading: a tempo-only conductor track is dropped, a **type-0 file is
+split into one track per channel**, note-on velocity 0 is a note-off, same-pitch overlaps pair FIFO, a hanging note lasts
+to the end, RPN 0 sets `bend_range`. Writing: type 1, conductor track first; at one tick note-offs, then setup
+(programs, CCs, bends), then note-ons; a note lasts at least one tick; RPN 0 written when `bend_range` ≠ 2.
+`to_sequence`: one sub-Sequence per track with notes (as `Score.to_sequence` per part), carrying the `time_map`; notes
+that start and end together (±1 ms) are one Event (chord); `pitch` names spelled as music21 spells MIDI (C# Eb F# G#
+Bb), `velocity` per pitch, `instrument` = track name › GM name of its first program › "Percussion" for channel 9.
+**Microtones = pitch bend** (Orchidea / OpenMusic / MPE practice): the bend on a note's channel at its start becomes
+`detuning_cents` (nearest pitch, ±50; exactly ±50 stays on the MIDI note, like a quarter tone keeps its step, §2.3).
+Bends and CCs within a note aren't Event data. `from_sequence`: tracks laid out like `Score.from_sequence`
+(sub-Sequences, loose events in one more track), notes from `pitch` (+ quarter-tone accidentals + `detuning_cents`) else
+`midi_note` (none: no note); velocity = `velocity` › last `dynamic` in the track (`DYNAMIC_VELOCITY`, MuseScore's values:
+p 49, mf 80, f 96…) › 80; time map = the Sequence's › 120 BPM 4/4. Track *i* plays on the *i*-th melodic channel; with
+detuning, `_allocate_channels` places notes in time order: home channel if bent right or silent (re-bent), else a spare
+channel (no track's home) bent right or silent, else any, else the nearest bend, so differently detuned notes never
+share a sounding channel. `lanes()` lists `(track, channel, controller)`; `cc_to_bpf(cc | PITCH_BEND, channel, track)`
+gives a **step** BPF (range 0–127, name "CC1 modulation"; pitch bend in cents, range ±`bend_range`). Until the MIDI
+viewer (M3.4), `str(Midi)` (Preview as Text) lists tracks, channels, note counts and lanes.
+Nodes: `m5_LoadMidi`, `m5_SaveMidi` (`m5/io`, numbered `<prefix>_00001_.mid` in `output/` like Save Audio, outputs the
+path), `m5_MidiToSequence`, `m5_SequenceToMidi` (`bend_range` advanced), `m5_MidiToBPF` (lane CC/pitch bend, cc,
+channel 0 = any, track −1 = any) in `m5/convert`. Score ⇄ MIDI goes through Sequence (direct nodes: M4.1).
 
 **Descriptor details (M2.6).** `m5.Descriptor(series, matrices, length_ms=None)`, a plain dataclass
 (`descriptor.py`): `series: {name: TimeSeries(times_ms, values, unit="", range=None)}` (one value per time point,
@@ -420,8 +451,10 @@ M13 = release work done along the way.
   and meter changes and the pickup; `from_midi_events` / `to_midi_events` are the hook for M2.4.
 - [ ] **M2.3 Proportional vs metered scores.** `Score` gets a `notation` mode (`metered` | `proportional`);
   proportional scores keep raw ms timings (spec: Score nodes support both). *Depends on:* M2.2.
-- [ ] **M2.4 `Midi` type.** Read/write `.mid`, `from_sequence` / `to_sequence`, tempo map, CC lanes → BPFs.
+- [x] **M2.4 `Midi` type.** Read/write `.mid`, `from_sequence` / `to_sequence`, tempo map, CC lanes → BPFs.
   *Depends on:* M2.2.
+  Done as `m5.Midi` (`midi.py`, mido; §2.2 MIDI details): microtones as pitch bends with channel allocation,
+  dynamics → velocities. Nodes Load/Save MIDI, MIDI to Sequence, Sequence to MIDI, MIDI to BPF.
 - [x] **M2.5 `BPF` type.** Points, interpolation (step/linear/exp), resample to a grid, rescale range, read/write JSON/CSV.
   m5 type, Load BPF / Rescale / Resample and the drawable BPF node (curve editor on top of the settings; incoming
   curves zoomed to their data), §2.2.
@@ -718,3 +751,10 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
 - 2026-11-13 · M2.5 feedback · BPF node's `name`/`unit` are advanced inputs (properties panel › Advanced inputs);
   editor ~41% of the 520 × 420 node. Checked in the browser (values saved/sent unchanged, old workflows fine). · Next:
   M2.3 / M2.4.
+- 2026-11-13 · M2.4 · m5: `Midi` (`midi.py`, new dependency `mido`): tracks of notes/CCs/pitch bends/programs in ms +
+  `TimeMap`; `.mid` read (type 0 split per channel, conductor track dropped, RPN 0 bend range) and write (type 1);
+  `to_sequence` (chords, GM instrument names, bends → `detuning_cents`), `from_sequence` (dynamics → velocities,
+  detuning → pitch bends over allocated channels), `lanes` / `cc_to_bpf`; fixture `duo_cc.mid` (+ generator), 15
+  tests. com5fy: `M5_MIDI`, Load MIDI, Save MIDI, MIDI to Sequence, Sequence to MIDI, MIDI to BPF; workflow `M2.4_midi`
+  (UI + API, checked in the browser). · Open: M2.3 needs the user's answer to §8 item 7 first; MIDI viewer is M3.4;
+  no BPF → CC lane yet (M4.6 / M7). Next: M2.3 (after §8.7), M2.7.
