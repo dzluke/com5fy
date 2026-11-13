@@ -90,8 +90,12 @@ class BPFNode(io.ComfyNode):
                                tooltip="Top of the value axis (and of the BPF's range)."),
                 io.Combo.Input("interpolation", options=list(m5.INTERPOLATIONS), default="linear",
                                tooltip="step: hold each value; linear; exp: geometric (for Hz, amplitudes)."),
-                io.String.Input("name", default="", tooltip="Optional: what the curve controls (e.g. brightness)."),
-                io.String.Input("unit", default="", tooltip="Optional: the values' unit (e.g. Hz)."),
+                # Advanced (user, 2026-11-13): edited in the properties panel's "Advanced inputs",
+                # hidden on the node, so the curve editor gets more of the node's height.
+                io.String.Input("name", default="", advanced=True,
+                                tooltip="Optional: what the curve controls (e.g. brightness)."),
+                io.String.Input("unit", default="", advanced=True,
+                                tooltip="Optional: the values' unit (e.g. Hz)."),
             ],
             outputs=[m5BPF.Output("bpf")],
         )

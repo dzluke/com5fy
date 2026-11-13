@@ -167,13 +167,16 @@ maps from it and clears `unit`. `resample(step_ms)` keeps the end point. Files: 
 **BPFs are mainly made by drawing them in the BPF node** (user decision 2026-11-10, M2.5 feedback). The `m5_BPF`
 node (`m5/create`, `nodes/create.py`, frontend `ui/src/bpf/`) is a curve editor like Max's `function` / DAW automation:
 its `points` widget (JSON `[[t, v]…]`) is swapped for the editor, so points are saved in the workflow and sent to the
-backend; `duration_ms`, `min`/`max` (= the BPF's `range`), `interpolation`, `name`, `unit` are widgets. With a BPF on
+backend; `duration_ms`, `min`/`max` (= the BPF's `range`), `interpolation` are widgets; `name` and `unit` are
+**advanced inputs** (`advanced=True`; user, 2026-11-13): hidden on the node, edited in the properties panel's
+"Advanced inputs" section or with the node's "Show advanced inputs" link, still saved and sent like any widget. With a BPF on
 its optional `input` it shows that curve read-only and passes it through, so it is also the BPF viewer ("Edit a copy"
 copies it into the editor). This node is the **exception to "data nodes are display-only"** (§7). No Preview as Text.
 Layout (user, 2026-11-13): the editor is the node's first widget, above the settings, and takes the height they
 leave; default node size 520 × 420 (the user asked for this size back after trying 560 × 760), where the editor is
-~31% of the node at its 120 px minimum + status row (the six settings rows take the rest); older workflows (settings
-first in `widgets_values`) are re-read by name on load.
+~41% of the node (31% when name/unit were rows too); older workflows (settings first in `widgets_values`) are
+re-read by name on load. (Plain `node.properties` were tried for name/unit: the Vue node renderer's context menu has
+no Properties entry, so nothing could edit them; advanced inputs are ComfyUI's own mechanism for this.)
 A curve on `input` is drawn **zoomed to its data** (min..max + 5%), not its nominal `range` (user, 2026-11-13: an f0
 track at 220–390 Hz is unreadable in 50–2000 Hz); "Edit a copy" still copies the nominal range into `min`/`max`.
 
@@ -712,3 +715,6 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
 - 2026-11-13 · M2.5 feedback · BPF node back to its 520 × 420 default (no growing of old nodes, editor minimum 120 px
   again), editor stays on top; workflows M2.5/M2.6 back to their earlier layout. At this size the editor is ~31% of the
   node. · Open: the user's call on a bigger editor at this size (fewer/compact settings). Next: M2.3 / M2.4.
+- 2026-11-13 · M2.5 feedback · BPF node's `name`/`unit` are advanced inputs (properties panel › Advanced inputs);
+  editor ~41% of the 520 × 420 node. Checked in the browser (values saved/sent unchanged, old workflows fine). · Next:
+  M2.3 / M2.4.
