@@ -5,7 +5,7 @@ import { type CSSProperties, useLayoutEffect, useRef, useSyncExternalStore } fro
 import type { Editor } from "./Editor";
 
 export const STATUS_HEIGHT = 22;
-export const MIN_EDITOR_HEIGHT = 120;
+export const MIN_EDITOR_HEIGHT = 300;
 
 const rootStyle: CSSProperties = {
   display: "flex",

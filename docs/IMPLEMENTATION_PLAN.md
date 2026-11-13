@@ -97,6 +97,9 @@ Frontend: edit `ui/src/`, then `cd ui && npm ci && npm run build` (reproducible)
 | `m5_ScoreToSequence`  | Score → Sequence (`Score.to_sequence`: the score's tempo marks, 120 BPM without) |
 | `m5_SequenceToScore`  | Sequence → Score (`Score.from_sequence`: quantization grid + bpm, 0 = estimated) |
 | `m5_AudioPlayback`    | waveform display + playback |
+| `m5_BPF`              | draw a BPF in a curve editor; with a BPF on `input`, shows it read-only (the BPF viewer) (M2.5) |
+| `m5_LoadBPF`          | `.json`/`.csv` from `input/` → BPF (M2.5) |
+| `m5_BPFRescale` / `m5_BPFResample` | rescale a BPF's value range / resample it to a time grid (M2.5) |
 | `m5_LoadDescriptor`   | `.json`/`.csv` from `input/` → Descriptor (M2.6) |
 | `m5_DescriptorToSequence` | onsets (+ pitch track) and/or partials → Sequence (M2.6) |
 | `m5_DescriptorToBPF`  | one descriptor series → BPF (M2.6) |
@@ -167,6 +170,10 @@ its `points` widget (JSON `[[t, v]…]`) is swapped for the editor, so points ar
 backend; `duration_ms`, `min`/`max` (= the BPF's `range`), `interpolation`, `name`, `unit` are widgets. With a BPF on
 its optional `input` it shows that curve read-only and passes it through, so it is also the BPF viewer ("Edit a copy"
 copies it into the editor). This node is the **exception to "data nodes are display-only"** (§7). No Preview as Text.
+Layout (user, 2026-11-13): the editor is the node's first widget, above the settings, and takes ~75% of the default
+560 × 760 node; older workflows (settings first in `widgets_values`) are re-read by name and grown on load.
+A curve on `input` is drawn **zoomed to its data** (min..max + 5%), not its nominal `range` (user, 2026-11-13: an f0
+track at 220–390 Hz is unreadable in 50–2000 Hz); "Edit a copy" still copies the nominal range into `min`/`max`.
 
 **Descriptor details (M2.6).** `m5.Descriptor(series, matrices, length_ms=None)`, a plain dataclass
 (`descriptor.py`): `series: {name: TimeSeries(times_ms, values, unit="", range=None)}` (one value per time point,
@@ -190,10 +197,8 @@ Files: JSON `{"length_ms", "series": {name: {"unit", "range", "times_ms", "value
 "units", "times_ms", "frames"}}}` (`null` = NaN; a series may also be a bare list of `[t, v]` pairs), one frame per
 line; CSV: a time column (`time_ms`, or seconds for `time_s`/`time (s)`/`time`) then one column per series with
 `name [unit]` headers (empty cell = no point, `nan` = missing value), or, when times repeat, one frame matrix per file
-(named after the file); CSV keeps no ranges. **SDIF is later work:** `pysdif3` 1.0.1 (latest, July 2024; cp312
-arm64 wheels) writes fine but cannot open a file whose first frame is an undeclared standard type such as plain
-`1TRC` (`TypeError` in `SdifFile.__init__`, a bytes/str bug), which is the usual SDIF from partial trackers; revisit
-when fixed upstream, or read `1TRC`/`1FQ0` with a small reader of our own. Until the Descriptor viewer (M3.5),
+(named after the file); CSV keeps no ranges. **No SDIF** (user decision 2026-11-13): not supported and not planned.
+(For the record: `pysdif3` 1.0.1 can't open plain `1TRC` files, a bytes/str bug in `SdifFile.__init__`.) Until the Descriptor viewer (M3.5),
 descriptors are shown with **Preview as Text** (`str(Descriptor)`: one line per track). Nodes: `m5_LoadDescriptor`
 (`m5/io`, `.json`/`.csv` from `input/`; the M7.1 importer), `m5_DescriptorToSequence` and `m5_DescriptorToBPF`
 (`m5/convert`; the §2.3 hub step and M4.6's "pick a descriptor as a BPF", which M4.6 extends with rescale/threshold).
@@ -412,13 +417,12 @@ M13 = release work done along the way.
   proportional scores keep raw ms timings (spec: Score nodes support both). *Depends on:* M2.2.
 - [ ] **M2.4 `Midi` type.** Read/write `.mid`, `from_sequence` / `to_sequence`, tempo map, CC lanes → BPFs.
   *Depends on:* M2.2.
-- [~] **M2.5 `BPF` type.** Points, interpolation (step/linear/exp), resample to a grid, rescale range, read/write JSON/CSV.
-  m5 type, Load BPF / Rescale / Resample and the drawable BPF node (curve editor) work and are tested; left: the
-  user's review of the editor, polish (see `docs/changes/2026-11-10_M2.5.md` › Status).
+- [x] **M2.5 `BPF` type.** Points, interpolation (step/linear/exp), resample to a grid, rescale range, read/write JSON/CSV.
+  m5 type, Load BPF / Rescale / Resample and the drawable BPF node (curve editor, on top, ~75% of the node; incoming
+  curves zoomed to their data), §2.2.
 - [x] **M2.6 `Descriptor` type.** Named time series + units + range; frame matrices (e.g. partials: time × (freq, amp));
   `to_bpf(name)`, `to_sequence()` (onsets/partials as events); read/write JSON/CSV and SDIF if a library is available.
-  Done as `m5.Descriptor` (`TimeSeries` + `FrameMatrix`, §2.2); JSON/CSV only, SDIF later (pysdif3 can't open plain
-  `1TRC`). Nodes `m5_LoadDescriptor`, `m5_DescriptorToSequence`, `m5_DescriptorToBPF`.
+  Done as `m5.Descriptor` (`TimeSeries` + `FrameMatrix`, §2.2); JSON/CSV only, no SDIF (user decision). Nodes `m5_LoadDescriptor`, `m5_DescriptorToSequence`, `m5_DescriptorToBPF`.
 - [ ] **M2.7 `Origin`.** Dataclass from §2.5, optional field on Audio/Score/Midi/Descriptor/BPF/Sequence;
   copied through transformations by a helper.
 - [ ] **M2.8 Serialization.** Each type gets `to_dict` / `from_dict` (JSON-safe, audio by file reference) — needed for
@@ -497,7 +501,7 @@ Spec: data nodes display only (no editing); each keeps a history of versions you
 Priority (user decision): **MuseScore, Ableton, Premiere**. Max/bach (M7.4) and DaVinci Resolve are deferred.
 
 - [ ] **M7.1 File import/export nodes.** Load/save for every type: audio (builtin), MusicXML/MIDI/ABC, `.mid`,
-  descriptor JSON/CSV/SDIF, BPF JSON/CSV. Origin set to `software="file"`. *Depends on:* M2.8.
+  descriptor JSON/CSV, BPF JSON/CSV. Origin set to `software="file"`. *Depends on:* M2.8.
 - [ ] **M7.2 OSC send/receive.** `python-osc`; send any serialized type, receive with a timeout (offline system, so a
   node waits for a message). *Depends on:* M2.8.
 - [ ] **M7.3 MuseScore.** Import/export MusicXML with Origin (score path + measure range); optional MuseScore CLI for
@@ -698,5 +702,8 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
   tracks such as partials; `to_bpf`, `to_sequence(onsets, pitch, partials, min_partial_ms)`, JSON/CSV; design in §2.2),
   fixture `melody.desc.json`, 22 tests. com5fy: `M5_DESCRIPTOR`, Load Descriptor, Descriptor to Sequence, Descriptor
   to BPF; workflow `M2.6_descriptor` (UI + API, checked in the browser; the f0 BPF is shown in a read-only BPF node,
-  following the M2.5 feedback). · Open: SDIF (pysdif3 bug), user feedback (change note), Descriptor viewer is M3.5;
-  M2.5 editor review still pending. Next: M2.3 / M2.4.
+  following the M2.5 feedback). · Open: user feedback (change note); Descriptor viewer is M3.5.
+- 2026-11-13 · M2.5 + M2.6 feedback · No SDIF (decision, §2.2). BPF node: editor moved above the settings and ~75% of
+  the node (default 560 × 760, old `widgets_values` order migrated on load, workflows M2.5/M2.6 relaid out); an
+  incoming curve is drawn zoomed to its data. Checked in the browser. M2.5 and M2.6 ticked. · Open: light theme of the
+  editor not looked at; points not stretched when duration/min/max change. Next: M2.3 / M2.4.

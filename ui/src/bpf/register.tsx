@@ -4,7 +4,8 @@
 // widget of the same name holding the curve editor; its value is the editor's points as
 // JSON, so they are saved in the workflow (widgets_values) and sent to the backend like any
 // widget. The other widgets (duration_ms, min, max, interpolation, name, unit) set the box
-// and are read at draw time. When the node runs with a BPF on its `input`, the backend sends
+// and are read at draw time. The editor is the first widget, so it sits above the settings
+// and takes most of the node (~75% at the default size). When the node runs with a BPF on its `input`, the backend sends
 // it back as ui.bpf and the editor shows it read-only.
 import { flushSync } from "react-dom";
 import { type Root, createRoot } from "react-dom/client";
@@ -37,6 +38,8 @@ type BPFProto = NodePrototype<BPFNode> & {
 };
 
 const SETTINGS = ["duration_ms", "min", "max", "interpolation", "name", "unit"];
+// Default node size: the editor gets ~75% of the height, the six settings the rest.
+const DEFAULT_SIZE = [560, 760];
 const LG_INPUT = 1; // LiteGraph NodeSlotType.INPUT
 
 function widget(node: BPFNode, name: string): Widget | undefined {
@@ -57,6 +60,25 @@ function settings(node: BPFNode): Omit<Curve, "points"> {
     name: String(widget(node, "name")?.value ?? ""),
     unit: String(widget(node, "unit")?.value ?? ""),
   };
+}
+
+/**
+ * Workflows saved before the editor moved above the settings (2026-11-13) have
+ * widgets_values in the old order, [...SETTINGS, points], and LiteGraph assigns them by
+ * position. The new order starts with the points (a JSON string) and the old one with
+ * duration_ms (a number), so a non-string first value means "old order": assign by name.
+ */
+function migrateWidgetOrder(node: BPFNode, info?: { widgets_values?: unknown[] }): void {
+  const values = info?.widgets_values;
+  if (!Array.isArray(values) || values.length < SETTINGS.length + 1 || typeof values[0] === "string") return;
+  SETTINGS.forEach((name, i) => {
+    const w = widget(node, name);
+    if (w) w.value = values[i];
+  });
+  const editor = node._m5Bpf?.editor;
+  if (editor) editor.points = parsePoints(values[SETTINGS.length]);
+  // Old nodes were 420 high, which leaves the editor small now that it sits on top.
+  node.setSize([Math.max(node.size[0], DEFAULT_SIZE[0]), Math.max(node.size[1], DEFAULT_SIZE[1])]);
 }
 
 /** Grey out the drawing settings while a BPF on `input` is shown instead. */
@@ -120,7 +142,8 @@ app.registerExtension({
       );
 
       // Swap the plain `points` text widget for the editor (same name, so it is saved and
-      // sent to the backend under `points`). The editor goes last so it takes the free height.
+      // sent to the backend under `points`). The editor is moved first (below) so it is drawn
+      // above the settings; as the only DOM widget it takes all the free height.
       const widgets = node.widgets ?? [];
       const textIndex = widgets.findIndex((w) => w.name === "points");
       if (textIndex >= 0) {
@@ -139,6 +162,8 @@ app.registerExtension({
         },
         getMinHeight: () => MIN_EDITOR_HEIGHT + STATUS_HEIGHT,
       });
+      const editorIndex = widgets.findIndex((w) => w.name === "points");
+      if (editorIndex > 0) widgets.unshift(...widgets.splice(editorIndex, 1));
       node._m5Bpf = { editor, root };
 
       // Redraw when a setting changes (no run needed: they only change the view until then).
@@ -153,8 +178,8 @@ app.registerExtension({
         };
       }
 
-      node.size[0] = Math.max(node.size[0], 520);
-      node.size[1] = Math.max(node.size[1], 420);
+      node.size[0] = Math.max(node.size[0], DEFAULT_SIZE[0]);
+      node.size[1] = Math.max(node.size[1], DEFAULT_SIZE[1]);
 
       if (node._m5PendingBpf) {
         show(node, node._m5PendingBpf);
@@ -163,7 +188,8 @@ app.registerExtension({
     });
 
     // Loading a workflow sets the widget values (points via setValue) without callbacks.
-    chainCallback(proto, "onConfigure", function () {
+    chainCallback(proto, "onConfigure", function (info) {
+      migrateWidgetOrder(this, info as { widgets_values?: unknown[] } | undefined);
       syncInputState(this);
       this._m5Bpf?.editor.draw();
     });

@@ -52,6 +52,21 @@ function theme(): Theme {
   };
 }
 
+/**
+ * The value axis for viewing a curve: its data's min..max plus 5% on each side, so a curve
+ * that uses a small part of its nominal range (an f0 track at 220-390 Hz in 50-2000 Hz) is
+ * still readable. Step/linear/exp segments never leave their endpoints' span, so the points'
+ * extremes are the curve's.
+ */
+function dataView(points: Point[]): [number, number] | undefined {
+  const values = points.map(([, v]) => v).filter(Number.isFinite);
+  if (!values.length) return undefined;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const pad = max > min ? (max - min) * 0.05 : Math.abs(min) * 0.05 || 0.5;
+  return [min - pad, max + pad];
+}
+
 export function payloadToCurve(p: BPFPayload): Curve {
   let [lo, hi] = p.range;
   if (!(hi > lo)) [lo, hi] = [lo - 0.5, hi + 0.5]; // a flat curve still needs a box
@@ -62,6 +77,7 @@ export function payloadToCurve(p: BPFPayload): Curve {
     duration: Math.max(p.duration, lastT) || 1,
     lo,
     hi,
+    view: dataView(p.points),
     name: p.name,
     unit: p.unit,
   };
@@ -179,7 +195,8 @@ export class Editor {
   private box() {
     const c = this.curve();
     const duration = c.duration > 0 ? c.duration : 1;
-    const [lo, hi] = c.hi > c.lo ? [c.lo, c.hi] : [c.lo - 0.5, c.lo + 0.5];
+    const [a, b] = c.view ?? [c.lo, c.hi];
+    const [lo, hi] = b > a ? [a, b] : [a - 0.5, a + 0.5];
     return { duration, lo, hi };
   }
 

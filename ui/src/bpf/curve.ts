@@ -11,6 +11,8 @@ export interface Curve {
   duration: number; // ms, length of the time axis
   lo: number; // value axis bottom
   hi: number; // value axis top
+  /** Value axis actually shown, when it differs from lo..hi: incoming curves zoom to their data. */
+  view?: [number, number];
   name: string;
   unit: string;
 }
