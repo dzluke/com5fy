@@ -151,7 +151,7 @@ Rule: if a function would be useful outside ComfyUI, it belongs in `m5`.
 | Audio | `m5.Audio` | builtin `AUDIO` | exists |
 | Event | `m5.Event` | — | exists; carried inside a Sequence |
 | Sequence | `m5.Sequence` | `M5_SEQUENCE` | exists; ms timebase |
-| Score | `m5.Score` | `M5_SCORE` | exists; music21-backed. Needs metered + proportional modes |
+| Score | `m5.Score` | `M5_SCORE` | exists; music21-backed, metered. Proportional scores are Sequences in the Sequence Viewer (M2.3 decision) |
 | MIDI | `m5.Midi` | `M5_MIDI` | exists (M2.4); `MidiTrack`s of notes / CCs / pitch bends / programs in ms + a `TimeMap`, via `mido`, see below |
 | Descriptor | `m5.Descriptor` | `M5_DESCRIPTOR` | exists (M2.6); named `TimeSeries` (times_ms, values, unit, range) + `FrameMatrix` tracks (partials…), see below |
 | Text | `str` | builtin `STRING` | reuse builtin |
@@ -194,8 +194,9 @@ split into one track per channel**, note-on velocity 0 is a note-off, same-pitch
 to the end, RPN 0 sets `bend_range`. Writing: type 1, conductor track first; at one tick note-offs, then setup
 (programs, CCs, bends), then note-ons; a note lasts at least one tick; RPN 0 written when `bend_range` ≠ 2.
 `to_sequence`: one sub-Sequence per track with notes (as `Score.to_sequence` per part), carrying the `time_map`; notes
-that start and end together (±1 ms) are one Event (chord); `pitch` names spelled as music21 spells MIDI (C# Eb F# G#
-Bb), `velocity` per pitch, `instrument` = track name › GM name of its first program › "Percussion" for channel 9.
+that start and end together (±1 ms) are one Event (chord); `pitch` names spell **every black key as a sharp** (C# D#
+F# G# A#; user, 2026-11-13), `velocity` per pitch, `instrument` = the track name; **unnamed tracks stay unnamed** (user,
+2026-11-13; no General MIDI program names).
 **Microtones = pitch bend** (Orchidea / OpenMusic / MPE practice): the bend on a note's channel at its start becomes
 `detuning_cents` (nearest pitch, ±50; exactly ±50 stays on the MIDI note, like a quarter tone keeps its step, §2.3).
 Bends and CCs within a note aren't Event data. `from_sequence`: tracks laid out like `Score.from_sequence`
@@ -449,8 +450,11 @@ M13 = release work done along the way.
   Score uses it instead of the fixed `DEFAULT_BPM`. Extract from music21 scores and MIDI files.
   Done as `m5.TimeMap` (`timemap.py`, §2.3); `Sequence.time_map` (optional) makes Score → Sequence → Score keep tempo
   and meter changes and the pickup; `from_midi_events` / `to_midi_events` are the hook for M2.4.
-- [ ] **M2.3 Proportional vs metered scores.** `Score` gets a `notation` mode (`metered` | `proportional`);
+- [x] **M2.3 Proportional vs metered scores.** `Score` gets a `notation` mode (`metered` | `proportional`);
   proportional scores keep raw ms timings (spec: Score nodes support both). *Depends on:* M2.2.
+  Done by decision (user, 2026-11-13; answers §8 item 7): a **proportional score is a Sequence** (raw ms timings) drawn
+  by the Sequence Viewer (time-based notation, `zoom`); `Score` stays metered and gets no `notation` mode. Sequence to
+  Score / Score to Sequence switch between the two. M3.3 shows proportional scores with the Sequence Viewer.
 - [x] **M2.4 `Midi` type.** Read/write `.mid`, `from_sequence` / `to_sequence`, tempo map, CC lanes → BPFs.
   *Depends on:* M2.2.
   Done as `m5.Midi` (`midi.py`, mido; §2.2 MIDI details): microtones as pitch bends with channel allocation,
@@ -644,7 +648,7 @@ What's below is still missing. A session that reaches one of these should ask th
 5. Score → audio without AFTER (M4.7): sample database, soundfont, or simple synth?
 6. Which descriptors matter, their units and ranges, and whether partials data is needed (M2.6, M4.3).
    M2.6 kept `m5.Descriptor` generic (any names/units, partials supported, §2.2), so this is now only M4.3's choice.
-7. How proportional notation should look in the Score node (M2.3, M3.3).
+7. ~~How proportional notation should look~~ — answered 2026-11-13: a Sequence in the Sequence Viewer (M2.3).
 8. What counts as "good enough" for Score + text editing — e.g. a pass rate on the W7 test set (M5.4).
 
 **Integration details to work out with the user's setup**
@@ -753,8 +757,11 @@ One line per session: `YYYY-MM-DD · task IDs · what changed · open items`.
   M2.3 / M2.4.
 - 2026-11-13 · M2.4 · m5: `Midi` (`midi.py`, new dependency `mido`): tracks of notes/CCs/pitch bends/programs in ms +
   `TimeMap`; `.mid` read (type 0 split per channel, conductor track dropped, RPN 0 bend range) and write (type 1);
-  `to_sequence` (chords, GM instrument names, bends → `detuning_cents`), `from_sequence` (dynamics → velocities,
+  `to_sequence` (chords, bends → `detuning_cents`), `from_sequence` (dynamics → velocities,
   detuning → pitch bends over allocated channels), `lanes` / `cc_to_bpf`; fixture `duo_cc.mid` (+ generator), 15
   tests. com5fy: `M5_MIDI`, Load MIDI, Save MIDI, MIDI to Sequence, Sequence to MIDI, MIDI to BPF; workflow `M2.4_midi`
   (UI + API, checked in the browser). · Open: M2.3 needs the user's answer to §8 item 7 first; MIDI viewer is M3.4;
   no BPF → CC lane yet (M4.6 / M7). Next: M2.3 (after §8.7), M2.7.
+- 2026-11-13 · M2.4 feedback, M2.3 · MIDI notes spelled with sharps only; unnamed MIDI tracks stay unnamed (no GM
+  instrument names). M2.3 closed by decision: proportional scores are Sequences shown in the Sequence Viewer, no
+  `notation` mode on Score (§8 item 7 answered). · Next: M2.7.

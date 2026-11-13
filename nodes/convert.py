@@ -540,7 +540,7 @@ class MidiToSequence(io.ComfyNode):
             display_name="MIDI to Sequence",
             category="m5/convert",
             description=(
-                "One staff per track (named after the track, or its General MIDI instrument); notes "
+                "One staff per track (named after the track; unnamed tracks stay unnamed); notes "
                 "that start and end together are one chord. Pitch bends at a note's start become "
                 "microtones (cents). The file's tempo and time signatures go along, so Sequence to "
                 "Score writes the same meters and tempo marks."
